@@ -1,0 +1,360 @@
+/* 1. UTILIDADES IMPRESCINDIBLES */
+.hidden {
+    display: none !important;
+}
+
+/* 2. BASE Y CONTENEDOR PRINCIPAL */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0a0a0a;
+    color: #e0e0e0;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+    background: #1e1e1e;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(123, 44, 191, 0.2);
+    border: 1px solid #333;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #6a1b9a;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+h1 { color: #9c4dcc; margin: 0; }
+
+/* 3. SELECTOR DE MODOS */
+.modo-selector {
+    display: flex;
+    flex-direction: row;
+    gap: 30px;
+    justify-content: center;
+    margin-bottom: 25px;
+    margin-top: 40px; /* Espacio extra arriba */
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 10px;
+    font-weight: bold;
+    color: #e0e0e0;
+    transition: 0.3s;
+}
+
+.radio-option:hover { color: #00d4ff; }
+
+/* 4. BLOQUES Y ACORDEÓN */
+details.bloque summary {
+    padding: 12px;
+    cursor: pointer;
+    background: #2d2d2d;
+    color: #9c4dcc;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-top: 8px;
+    list-style: none;
+    border-left: 4px solid #6a1b9a;
+    transition: all 0.3s ease;
+}
+
+details.bloque summary:hover {
+    background: rgba(123, 44, 191, 0.2);
+    border: 1px solid #7b2cbf;
+    box-shadow: 0 0 15px rgba(123, 44, 191, 0.5);
+    padding-left: 20px;
+}
+
+details.bloque[open] summary {
+    color: #00d4ff;
+    border-bottom: 1px solid #7b2cbf;
+    margin-bottom: 10px;
+}
+
+/* 5. BOTONES Y ACCIONES */
+.btn-main {
+    background: #6a1b9a;
+    color: white;
+    border: none;
+    padding: 18px 50px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(106, 27, 154, 0.4);
+    transition: 0.3s;
+}
+
+.btn-main:hover { background: #9c4dcc; transform: translateY(-2px); }
+.btn-main:disabled { background: #444; cursor: not-allowed; box-shadow: none; }
+
+.btn-warning {
+    background-color: #444;
+    color: white;
+    border: 2px solid #ffc107;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-warning.active { background: #ffc107; color: black; font-weight: bold; }
+
+.btn-danger {
+    background: #b00020;
+    color: white;
+    border: 1px solid #ff4d4d;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+.btn-danger:hover { background: #e53935; transform: scale(1.05); }
+
+/* 6. SECCIONES Y GRID */
+.grid-sections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.section-box {
+    flex: 1 1 400px;
+    background: #1a1a1a;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #333;
+}
+
+.test-item {
+    display: block;
+    padding: 12px;
+    margin: 5px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    background: #2d2d2d;
+    transition: 0.2s;
+}
+
+.test-item:hover { background: #3d3d3d; border-left: 4px solid #00d4ff; }
+
+/* 7. PANTALLA DE TEST Y OPCIONES */
+.test-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+}
+
+/* TÍTULO Y CONTADOR GRANDE */
+#contador-preguntas {
+    font-weight: bold;
+    color: #9c4dcc;
+    font-size: 1.2rem;
+}
+
+/* PREGUNTA GRANDE */
+#enunciado {
+    font-size: 1.35rem;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+/* OPCIONES GRANDES */
+.opcion {
+    width: 100%;
+    text-align: left;
+    padding: 18px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: 0.3s;
+    box-sizing: border-box;
+    font-size: 1.15rem; /* Texto aumentado */
+    line-height: 1.4;
+}
+
+.opcion:hover { background: #3a3a3a; border-color: #9c4dcc; }
+.opcion.selected { border: 2px solid #9c4dcc; background: #3d1e52; }
+
+/* FEEDBACK ANCHO Y GRANDE */
+#feedback-area {
+    margin-top: 15px;
+    padding: 15px;
+    background: #252525;
+    border: 1px solid #444;
+    border-radius: 8px;
+    width: 100%; 
+    box-sizing: border-box;
+    border-left: 4px solid #9c4dcc;
+}
+
+#feedback-texto { 
+    margin: 0; 
+    font-size: 1.1rem; /* Texto aumentado */
+    line-height: 1.5; 
+}
+
+/* ALINEACIÓN IZQUIERDA */
+.test-footer {
+    margin-top: 20px;
+    text-align: left;
+}
+
+/* 8. RESULTADOS Y ESTADÍSTICAS (EFECTO CÁPSULA 3D) */
+.resumen-stats {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 20px; /* Un poco más de espacio */
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+/* EFECTO CÁPSULA RELIEVE */
+.stat-card {
+    flex: 1;
+    min-width: 120px;
+    padding: 20px 10px;
+    border-radius: 30px; /* Bordes muy redondeados */
+    text-align: center;
+    font-weight: bold;
+    color: white;
+    
+    /* Sombras interiores para dar volumen 3D */
+    box-shadow: 
+        inset 0 4px 8px rgba(255, 255, 255, 0.4), /* Brillo superior */
+        inset 0 -4px 8px rgba(0, 0, 0, 0.4),      /* Sombra inferior */
+        0 8px 15px rgba(0, 0, 0, 0.5);            /* Sombra en el suelo */
+    
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    
+    transition: transform 0.2s;
+    position: relative;
+    overflow: hidden; /* Para el brillo */
+}
+
+/* Brillo superior efecto cristal */
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+    border-radius: 30px 30px 0 0;
+    pointer-events: none;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px); /* Flota al pasar el ratón */
+}
+
+/* Fondos con degradado para potenciar el 3D */
+.card-aciertos { 
+    background: linear-gradient(145deg, #2ecc71, #218c53); 
+}
+.card-fallos { 
+    background: linear-gradient(145deg, #e74c3c, #c0392b); 
+}
+.card-dudas { 
+    background: linear-gradient(145deg, #f1c40f, #f39c12); 
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+.caja-brillo-celeste {
+    border: 2px solid #00d4ff;
+    border-radius: 15px;
+    padding: 15px 40px;
+    text-align: center;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+    width: fit-content;
+    margin: 0 auto;
+    display: block;
+}
+
+.porcentaje-celeste { color: #00d4ff; font-size: 3rem; font-weight: 900; text-shadow: 0 0 10px #00d4ff; }
+
+/* REVISIÓN */
+.item-revision {
+    background: #252525;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 4px solid #444;
+}
+.txt-fallo { color: #dc3545; font-weight: bold; }
+.txt-duda { color: #f1c40f; font-weight: bold; }
+.txt-correcta { color: #2ecc71; font-weight: bold; }
+
+/* CAJA IMPECABLE */
+.box-impecable {
+    text-align: center;
+    padding: 20px;
+    color: #2ecc71;
+    border: 1px dashed #2ecc71;
+    border-radius: 10px;
+    width: fit-content;
+    margin: 20px auto;
+}
+
+.btn-volver {
+    background: #7b2cbf;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: 0.3s;
+    display: block;
+    margin: 20px auto;
+}
+.btn-volver:hover { background: #9c4dcc; transform: translateY(-2px); box-shadow: 0 0 15px rgba(156, 77, 204, 0.4); }
+
+/* ESTADÍSTICAS GLOBALES */
+.bloque-est-container {
+    background: #1a1a1a;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    border: 1px solid #333;
+}
+.info-bloque { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; }
+.barra-fondo { background: #333; height: 8px; border-radius: 4px; overflow: hidden; }
+.barra-progreso-celeste { background: #00d4ff; height: 100%; box-shadow: 0 0 8px #00d4ff; }
+.detalle-est { font-size: 0.85rem; color: #aaa; margin-top: 5px; text-align: right; }
+
+/* 9. MEDIA QUERIES (MÓVIL) */
+@media (max-width: 768px) {
+    .container { padding: 15px; width: 95%; }
+    .modo-selector { flex-direction: column; align-items: center; gap: 15px; }
+    .grid-sections { flex-direction: column; }
+    .resumen-stats { flex-direction: column; align-items: center; }
+    .stat-card { width: 100%; max-width: none; }
+    h1 { font-size: 1.5rem; }
+    .btn-main { width: 100%; padding: 15px; }
+}
