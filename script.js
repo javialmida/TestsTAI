@@ -4,46 +4,45 @@ let preguntasTest = [];
 let preguntaActualIndex = 0;
 let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
 let modoEstudio = true;
-let esDudada = false;
 
 async function cargarMenuDinamico() {
     try {
         const res = await fetch(`${URL_SCRIPT}?accion=obtenerListaTests`);
-        const tests = await res.json();
+        const texto = await res.text(); // Recibimos como texto
+        const tests = JSON.parse(texto); // Convertimos a objeto
+        
         ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = "";
         });
+
         tests.forEach(t => {
             const label = document.createElement('label');
             label.className = 'test-item';
             label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombreVisible}</span>`;
-            const idSuperior = t.id.toUpperCase();
-            if (idSuperior.startsWith("EX") || idSuperior.startsWith("SI")) {
-                document.getElementById('lista-oficiales').appendChild(label);
-            } else {
-                const contenedor = document.getElementById(`lista-B${t.bloque}`);
-                if (contenedor) contenedor.appendChild(label);
-            }
+            const idSup = t.id.toUpperCase();
+            const cont = (idSup.startsWith("EX") || idSup.startsWith("SI")) ? document.getElementById('lista-oficiales') : document.getElementById(`lista-B${t.bloque}`);
+            if (cont) cont.appendChild(label);
         });
+        
         document.querySelectorAll('details.bloque').forEach(d => {
             d.querySelector('summary').onclick = () => {
-                document.querySelectorAll('details.bloque').forEach(other => {
-                    if (other !== d) other.removeAttribute('open');
-                });
+                document.querySelectorAll('details.bloque').forEach(other => { if (other !== d) other.removeAttribute('open'); });
             };
         });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.log("Cargando..."); }
 }
 
 document.getElementById('btnComenzar').onclick = async () => {
-    const seleccionado = document.querySelector('input[name="test-select"]:checked');
-    if (!seleccionado) return alert("Selecciona un test 🚀");
+    const sel = document.querySelector('input[name="test-select"]:checked');
+    if (!sel) return alert("Selecciona un test 🚀");
     const btn = document.getElementById('btnComenzar');
     btn.textContent = "CARGANDO...";
     try {
-        const res = await fetch(`${URL_SCRIPT}?idTest=${seleccionado.value}`);
-        preguntasTest = await res.json();
+        const res = await fetch(`${URL_SCRIPT}?idTest=${sel.value}`);
+        const texto = await res.text();
+        preguntasTest = JSON.parse(texto);
+        
         modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
         document.getElementById('pantalla-inicio').classList.add('hidden');
         if(document.querySelector('.footer-controls')) document.querySelector('.footer-controls').classList.add('hidden');
@@ -51,13 +50,12 @@ document.getElementById('btnComenzar').onclick = async () => {
         preguntaActualIndex = 0;
         puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
         mostrarPregunta();
-    } catch (e) { alert("Error al cargar preguntas. Reintenta."); }
+    } catch (e) { alert("Error de datos. Prueba a darle otra vez."); }
     finally { btn.textContent = "COMENZAR TEST"; }
 };
 
 function mostrarPregunta() {
     const p = preguntasTest[preguntaActualIndex];
-    esDudada = false;
     document.getElementById('btnArriesgando').classList.remove('active');
     document.getElementById('feedback-area').classList.add('hidden');
     document.getElementById('contador-preguntas').textContent = `Pregunta ${preguntaActualIndex + 1}/${preguntasTest.length}`;
@@ -83,6 +81,7 @@ function mostrarPregunta() {
     });
 }
 
+let esDudada = false;
 document.getElementById('btnArriesgando').onclick = function() {
     esDudada = !esDudada;
     this.classList.toggle('active', esDudada);
@@ -91,9 +90,6 @@ document.getElementById('btnArriesgando').onclick = function() {
 function procesarRespuesta(seleccionada) {
     const p = preguntasTest[preguntaActualIndex];
     const correcta = p.correcta.toLowerCase().trim();
-    p.tuRespuesta = seleccionada;
-    p.tuRespuestaText = `${seleccionada}) ${p.opciones[seleccionada]}`; 
-    p.fueDudada = esDudada; 
     if (esDudada) puntuacion.arriesgadas++;
     if (seleccionada === correcta) puntuacion.aciertos++;
     else puntuacion.fallos++;
@@ -129,25 +125,10 @@ function mostrarResumen() {
             <div class="stat-card card-fallos">FALLOS: ${puntuacion.fallos}</div>
             <div class="stat-card card-dudas">DUDAS: ${puntuacion.arriesgadas}</div>
         </div>
-        <div class="caja-brillo-celeste" style="margin-top:20px;">
-            <span class="porcentaje-celeste">${nota}%</span>
-        </div>
+        <div class="caja-brillo-celeste" style="margin-top:20px;"><span class="porcentaje-celeste">${nota}%</span></div>
     `;
-    const informe = document.getElementById('contenedor-informe');
-    informe.innerHTML = '<h3 style="text-align:center;">REVISIÓN</h3>';
-    preguntasTest.forEach((p, i) => {
-        if (p.tuRespuesta === p.correcta && !p.fueDudada) return;
-        const div = document.createElement('div');
-        div.className = "item-revision";
-        div.innerHTML = `<p><strong>${i + 1}. ${p.enunciado}</strong></p><p>Tuya: ${p.tuRespuestaText} | Correcta: ${p.correcta}</p>`;
-        informe.appendChild(div);
-    });
     document.getElementById('contenedor-boton-volver').innerHTML = `<button class="btn-main" onclick="location.reload()">INICIO</button>`;
-    finalizar(nota);
-}
-
-function finalizar(nota) {
-    const sel = document.querySelector('input[name=\"test-select\"]:checked');
+    const sel = document.querySelector('input[name="test-select"]:checked');
     const url = `${URL_SCRIPT}?accion=guardar&test=${encodeURIComponent(sel.value)}&aciertos=${puntuacion.aciertos}&fallos=${puntuacion.fallos}&dudas=${puntuacion.arriesgadas}&nota=${nota}`;
     fetch(url, { mode: 'no-cors' });
 }
