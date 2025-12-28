@@ -45,7 +45,7 @@ async function cargarMenuDinamico() {
     }
 }
 
-// 3. BOTÓN COMENZAR (CON PARCHE ANTIBLOQUEO CORS)
+// 3. BOTÓN COMENZAR (CON REFUERZO DE REDIRECCIÓN)
 document.getElementById('btnComenzar').onclick = async () => {
     const seleccionado = document.querySelector('input[name="test-select"]:checked');
     if (!seleccionado) return alert("Por favor, selecciona un test antes de despegar 🚀");
@@ -54,11 +54,10 @@ document.getElementById('btnComenzar').onclick = async () => {
     btn.textContent = "CARGANDO...";
     
     try {
-        // Añadimos timestamp para evitar que el navegador use una respuesta cacheada y bloquee el CORS
         const timestamp = new Date().getTime();
+        // Forzamos redirect 'follow' para que el navegador siga la respuesta de Google
         const res = await fetch(`${URL_SCRIPT}?idTest=${seleccionado.value}&t=${timestamp}`, {
             method: 'GET',
-            mode: 'cors',
             redirect: 'follow'
         });
         
@@ -75,7 +74,7 @@ document.getElementById('btnComenzar').onclick = async () => {
         mostrarPregunta();
     } catch (e) {
         console.error(e);
-        alert("Error de conexión con el banco de datos. Por favor, intenta recargar la página.");
+        alert("Error de conexión. Si acabas de actualizar el script en Google, espera 30 segundos y recarga.");
     } finally {
         btn.textContent = "COMENZAR TEST";
     }
@@ -107,11 +106,7 @@ function mostrarPregunta() {
     ["a", "b", "c", "d"].forEach(letra => {
         const btn = document.createElement('button');
         btn.className = "opcion";
-        
-        // --- VISUALMENTE PONEMOS "a) ..." ---
         btn.textContent = `${letra}) ${p.opciones[letra]}`; 
-        
-        // --- INTERNAMENTE GUARDAMOS SOLO LA LETRA PARA CORREGIR ---
         btn.dataset.letra = letra; 
 
         btn.onclick = () => {
@@ -139,10 +134,6 @@ function procesarRespuesta(seleccionada) {
     const correcta = p.correcta.toString().toLowerCase().trim();
     seleccionada = seleccionada.toString().toLowerCase().trim();
 
-    const radioSeleccionado = document.querySelector('input[name="test-select"]:checked');
-    const nombreDelMenu = radioSeleccionado ? radioSeleccionado.parentElement.textContent.trim() : "Test";
-    
-    p.tituloTema = p.tituloTema || nombreDelMenu;
     p.tuRespuesta = seleccionada;
     p.tuRespuestaText = `${seleccionada}) ${p.opciones[seleccionada]}`; 
     p.fueDudada = esDudada; 
@@ -157,7 +148,6 @@ function procesarRespuesta(seleccionada) {
     if (modoEstudio) {
         document.querySelectorAll('.opcion').forEach(btn => {
             const letraBoton = btn.dataset.letra; 
-
             if (letraBoton === correcta) {
                 btn.style.background = "#28a745"; 
                 btn.style.borderColor = "#28a745";
@@ -213,7 +203,6 @@ function mostrarResumen() {
             <span>DUDAS</span><br>
             <span style="font-size: 1.5rem;">${puntuacion.arriesgadas}</span>
         </div>
-        
         <div class="contenedor-resultado-especial" style="width: 100%; flex-basis: 100%; margin-top: 15px;">
             <div class="caja-brillo-celeste">
                 <span class="titulo-resultado">RESULTADO FINAL</span><br>
@@ -226,94 +215,62 @@ function mostrarResumen() {
     informe.innerHTML = '<h3 style="color:#00d4ff; text-align:center; margin-top:30px;">REVISIÓN DE ERRORES Y DUDAS</h3>';
     
     let hayRevision = false;
-
     preguntasTest.forEach((p, index) => {
         const rUser = (p.tuRespuesta || "").toLowerCase();
         const rCorr = (p.correcta || "").toLowerCase();
         const esCorrecta = rUser === rCorr;
-        
         if (esCorrecta && !p.fueDudada) return;
 
         hayRevision = true;
         const div = document.createElement('div');
         div.className = "item-revision";
-        
-        let icono, claseTitulo, textoEstado;
-        
-        if (esCorrecta && p.fueDudada) {
-            icono = "⚠️"; 
-            claseTitulo = "txt-duda";
-            textoEstado = "ACERTADA (CON DUDAS)";
-        } else {
-            icono = "❌";
-            claseTitulo = "txt-fallo";
-            textoEstado = "FALLADA";
-        }
+        let icono = esCorrecta ? "⚠️" : "❌";
+        let claseTitulo = esCorrecta ? "txt-duda" : "txt-fallo";
+        let textoEstado = esCorrecta ? "ACERTADA (CON DUDAS)" : "FALLADA";
 
         div.innerHTML = `
             <p><strong>${index + 1}. ${p.enunciado}</strong></p>
             <p class="${claseTitulo}" style="font-weight:bold; margin-bottom: 5px;">${icono} ${textoEstado}</p>
-            
             <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 5px;">
                 <p style="margin: 5px 0;">👉 <strong>Tu respuesta:</strong> ${p.tuRespuestaText || "Sin respuesta"}</p>
                 <p style="margin: 5px 0;" class="txt-correcta">✅ <strong>Correcta:</strong> ${p.opciones[rCorr] ? rCorr + ') ' + p.opciones[rCorr] : rCorr}</p>
             </div>
-
             ${p.feedback ? `<div class="box-feedback" style="margin-top:10px;"><strong>💡 Explicación:</strong> ${p.feedback}</div>` : ''}
         `;
         informe.appendChild(div);
     });
 
     if (!hayRevision) {
-        informe.innerHTML += `
-            <div class="box-impecable">
-                <h3>¡IMPECABLE! 🏆</h3>
-                <p>No has tenido fallos ni dudas marcadas en este test.</p>
-            </div>`;
+        informe.innerHTML += `<div class="box-impecable"><h3>¡IMPECABLE! 🏆</h3></div>`;
     }
 
     const contenedorBoton = document.getElementById('contenedor-boton-volver');
     contenedorBoton.innerHTML = `<button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>`;
-
     finalizar();
 }
 
 function finalizar() {
     const seleccionado = document.querySelector('input[name="test-select"]:checked');
     const idTest = seleccionado ? seleccionado.value : "SIN_ID"; 
-    
     const totalPreguntas = preguntasTest.length;
-    let notaPorcentaje = 0;
-    
-    if (totalPreguntas > 0) {
-        notaPorcentaje = ((puntuacion.aciertos / totalPreguntas) * 100).toFixed(2);
-    }
+    let notaPorcentaje = totalPreguntas > 0 ? ((puntuacion.aciertos / totalPreguntas) * 100).toFixed(2) : 0;
 
-    const urlConDatos = `${URL_SCRIPT}?accion=guardar` +
-                        `&test=${encodeURIComponent(idTest)}` + 
-                        `&aciertos=${puntuacion.aciertos}` +
-                        `&fallos=${puntuacion.fallos}` +
-                        `&dudas=${puntuacion.arriesgadas}` +
-                        `&nota=${notaPorcentaje}`;
+    const urlConDatos = `${URL_SCRIPT}?accion=guardar&test=${encodeURIComponent(idTest)}&aciertos=${puntuacion.aciertos}&fallos=${puntuacion.fallos}&dudas=${puntuacion.arriesgadas}&nota=${notaPorcentaje}`;
 
     fetch(urlConDatos, { mode: 'no-cors' })
-        .then(() => console.log("Guardado ID: " + idTest + " Nota: " + notaPorcentaje))
+        .then(() => console.log("Guardado"))
         .catch(err => console.error(err));
 }
 
 // 8. INTERFAZ Y NAVEGACIÓN
 document.getElementById('btnSalir').onclick = () => {
-    if (confirm("¿Seguro que quieres abandonar? Los progresos de este test se perderán.")) {
-        location.reload();
-    }
+    if (confirm("¿Abandonar test?")) location.reload();
 };
 
 async function mostrarEstadisticas() {
     document.getElementById('pantalla-inicio').classList.add('hidden');
     document.getElementById('pantalla-test').classList.add('hidden');
     document.getElementById('pantalla-resultados').classList.add('hidden');
-    if(document.querySelector('.footer-controls')) document.querySelector('.footer-controls').classList.add('hidden');
-    
     const pantallaEst = document.getElementById('pantalla-estadisticas');
     pantallaEst.classList.remove('hidden');
     pantallaEst.innerHTML = '<h2 style="text-align:center; color:#9c4dcc;">CARGANDO TUS NOTAS...</h2>';
@@ -321,65 +278,26 @@ async function mostrarEstadisticas() {
     try {
         const resp = await fetch(`${URL_SCRIPT}?accion=obtenerEstadisticas`);
         const temas = await resp.json();
-
         let html = '<h2 style="text-align:center; color:#9c4dcc;">RENDIMIENTO POR TEMAS</h2>';
         
-        if (Object.keys(temas).length === 0) {
-            html += '<p style="text-align:center">Aún no hay datos registrados.</p>';
-        }
-
         for (let idClave in temas) {
             const t = temas[idClave];
             const totalHistorico = t.aciertos + t.fallos; 
             const porcentaje = totalHistorico > 0 ? ((t.aciertos / totalHistorico) * 100).toFixed(1) : 0;
-            
             const radioOriginal = document.querySelector(`input[value="${idClave}"]`);
-            let nombreMostrar = idClave;
-            let esLinkeable = false;
-
-            if (radioOriginal) {
-                nombreMostrar = radioOriginal.parentElement.textContent.trim();
-                esLinkeable = true;
-            }
-
-            const itemHTML = esLinkeable 
-                ? `<a href="#" onclick="repetirTest('${idClave}')" style="color: #00d4ff; text-decoration: none; border-bottom: 1px dashed #00d4ff; font-weight: bold;">${nombreMostrar} ↻</a>`
-                : `<span style="color: #888;">${nombreMostrar}</span>`;
+            let nombreMostrar = radioOriginal ? radioOriginal.parentElement.textContent.trim() : idClave;
 
             html += `
                 <div class="bloque-est-container">
-                    <div class="info-bloque">
-                        <span>${itemHTML}</span>
-                        <span>${porcentaje}%</span>
-                    </div>
-                    <div class="barra-fondo">
-                        <div class="barra-progreso-celeste" style="width: ${porcentaje}%"></div>
-                    </div>
+                    <div class="info-bloque"><span>${nombreMostrar}</span><span>${porcentaje}%</span></div>
+                    <div class="barra-fondo"><div class="barra-progreso-celeste" style="width: ${porcentaje}%"></div></div>
                     <p class="detalle-est">${t.aciertos} aciertos / ${t.fallos} fallos</p>
-                </div>
-            `;
+                </div>`;
         }
         html += '<button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>';
         pantallaEst.innerHTML = html;
-
     } catch (error) {
-        console.error(error);
-        pantallaEst.innerHTML = '<p style="text-align:center">Error al conectar con las estadísticas.</p><button class="btn-volver" onclick="location.reload()">VOLVER</button>';
-    }
-}
-
-function repetirTest(idTest) {
-    document.getElementById('pantalla-estadisticas').classList.add('hidden');
-    document.getElementById('pantalla-inicio').classList.remove('hidden');
-    document.querySelector('.footer-controls').classList.remove('hidden');
-
-    const radio = document.querySelector(`input[value="${idTest}"]`);
-    if (radio) {
-        radio.checked = true;
-        document.querySelectorAll('details.bloque').forEach(d => d.removeAttribute('open'));
-        const bloqueDetails = radio.closest('details');
-        if (bloqueDetails) bloqueDetails.setAttribute('open', 'true');
-        radio.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pantallaEst.innerHTML = '<button class="btn-volver" onclick="location.reload()">VOLVER</button>';
     }
 }
 
