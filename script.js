@@ -4,12 +4,12 @@ let preguntasTest = [];
 let preguntaActualIndex = 0;
 let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
 let modoEstudio = true;
+let esDudada = false;
 
 async function cargarMenuDinamico() {
     try {
         const res = await fetch(`${URL_SCRIPT}?accion=obtenerListaTests`);
-        const texto = await res.text(); // Recibimos como texto
-        const tests = JSON.parse(texto); // Convertimos a objeto
+        const tests = await res.json();
         
         ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
             const el = document.getElementById(id);
@@ -21,16 +21,16 @@ async function cargarMenuDinamico() {
             label.className = 'test-item';
             label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombreVisible}</span>`;
             const idSup = t.id.toUpperCase();
-            const cont = (idSup.startsWith("EX") || idSup.startsWith("SI")) ? document.getElementById('lista-oficiales') : document.getElementById(`lista-B${t.bloque}`);
-            if (cont) cont.appendChild(label);
+            const contenedor = (idSup.startsWith("EX") || idSup.startsWith("SI")) ? document.getElementById('lista-oficiales') : document.getElementById(`lista-B${t.bloque}`);
+            if (contenedor) contenedor.appendChild(label);
         });
-        
+
         document.querySelectorAll('details.bloque').forEach(d => {
             d.querySelector('summary').onclick = () => {
                 document.querySelectorAll('details.bloque').forEach(other => { if (other !== d) other.removeAttribute('open'); });
             };
         });
-    } catch (e) { console.log("Cargando..."); }
+    } catch (e) { console.error("Error al cargar menú:", e); }
 }
 
 document.getElementById('btnComenzar').onclick = async () => {
@@ -38,11 +38,13 @@ document.getElementById('btnComenzar').onclick = async () => {
     if (!sel) return alert("Selecciona un test 🚀");
     const btn = document.getElementById('btnComenzar');
     btn.textContent = "CARGANDO...";
+    
     try {
-        const res = await fetch(`${URL_SCRIPT}?idTest=${sel.value}`);
-        const texto = await res.text();
-        preguntasTest = JSON.parse(texto);
-        
+        const res = await fetch(`${URL_SCRIPT}?idTest=${sel.value}&t=${new Date().getTime()}`, {
+            method: 'GET',
+            redirect: 'follow'
+        });
+        preguntasTest = await res.json();
         modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
         document.getElementById('pantalla-inicio').classList.add('hidden');
         if(document.querySelector('.footer-controls')) document.querySelector('.footer-controls').classList.add('hidden');
@@ -50,12 +52,13 @@ document.getElementById('btnComenzar').onclick = async () => {
         preguntaActualIndex = 0;
         puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
         mostrarPregunta();
-    } catch (e) { alert("Error de datos. Prueba a darle otra vez."); }
+    } catch (e) { alert("Error al conectar. Por favor, reintenta."); }
     finally { btn.textContent = "COMENZAR TEST"; }
 };
 
 function mostrarPregunta() {
     const p = preguntasTest[preguntaActualIndex];
+    esDudada = false;
     document.getElementById('btnArriesgando').classList.remove('active');
     document.getElementById('feedback-area').classList.add('hidden');
     document.getElementById('contador-preguntas').textContent = `Pregunta ${preguntaActualIndex + 1}/${preguntasTest.length}`;
@@ -81,7 +84,6 @@ function mostrarPregunta() {
     });
 }
 
-let esDudada = false;
 document.getElementById('btnArriesgando').onclick = function() {
     esDudada = !esDudada;
     this.classList.toggle('active', esDudada);
@@ -121,9 +123,8 @@ function mostrarResumen() {
     const nota = total > 0 ? ((puntuacion.aciertos / total) * 100).toFixed(2) : 0;
     document.getElementById('contenedor-stats').innerHTML = `
         <div class="resumen-stats">
-            <div class="stat-card card-aciertos">ACIERTOS: ${puntuacion.aciertos}</div>
-            <div class="stat-card card-fallos">FALLOS: ${puntuacion.fallos}</div>
-            <div class="stat-card card-dudas">DUDAS: ${puntuacion.arriesgadas}</div>
+            <div class="stat-card">ACIERTOS: ${puntuacion.aciertos}</div>
+            <div class="stat-card">FALLOS: ${puntuacion.fallos}</div>
         </div>
         <div class="caja-brillo-celeste" style="margin-top:20px;"><span class="porcentaje-celeste">${nota}%</span></div>
     `;
