@@ -1,6 +1,6 @@
 // 1. CONFIGURACIÓN SUPABASE
-const SUPABASE_URL = "https://ogpprghtohbumqihzxwt.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI";
+const SB_URL = "https://ogpprghtohbumqihzxwt.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI";
 
 let preguntasTest = [];
 let preguntaActualIndex = 0;
@@ -8,88 +8,73 @@ let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
 let modoEstudio = true;
 let esDudada = false;
 
-// Conector directo
-async function supabaseFetch(endpoint) {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
-        method: 'GET',
-        headers: {
-            "apikey": SUPABASE_KEY,
-            "Authorization": `Bearer ${SUPABASE_KEY}`,
-            "Content-Type": "application/json"
-        }
-    });
-    if (!response.ok) throw new Error("Error en Supabase");
-    return await response.json();
-}
-
-// 2. CARGA DEL MENÚ
-async function cargarMenuDinamico() {
+// 2. FUNCIÓN DE CARGA DEL MENÚ
+async function cargarMenu() {
     try {
-        const data = await supabaseFetch("tests?select=id,nombre,bloque_id&visible=eq.true&order=id.asc");
+        const r = await fetch(`${SB_URL}/rest/v1/tests?select=id,nombre,bloque_id&visible=eq.true&order=id.asc`, {
+            headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+        });
+        const tests = await r.json();
         
-        ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = "";
-        });
+        const listas = ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'];
+        listas.forEach(id => { if(document.getElementById(id)) document.getElementById(id).innerHTML = ""; });
 
-        data.forEach(t => {
-            const label = document.createElement('label');
-            label.className = 'test-item';
-            label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombre}</span>`;
-            
-            const contenedorId = t.bloque_id === 5 ? 'lista-oficiales' : `lista-B${t.bloque_id}`;
-            const contenedor = document.getElementById(contenedorId);
-            if (contenedor) contenedor.appendChild(label);
+        tests.forEach(t => {
+            const containerId = t.bloque_id === 5 ? 'lista-oficiales' : `lista-B${t.bloque_id}`;
+            const contenedor = document.getElementById(containerId);
+            if (contenedor) {
+                const item = document.createElement('label');
+                item.className = 'test-item';
+                item.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombre}</span>`;
+                contenedor.appendChild(item);
+            }
         });
-    } catch (e) { console.error("Error cargando menú", e); }
+    } catch (e) { console.error("Error inicial:", e); }
 }
 
-// 3. COMENZAR TEST
+// 3. COMENZAR TEST (CIRUGÍA AQUÍ)
 document.getElementById('btnComenzar').onclick = async () => {
-    const radio = document.querySelector('input[name="test-select"]:checked');
-    if (!radio) return alert("Selecciona un test 🚀");
+    const seleccionado = document.querySelector('input[name="test-select"]:checked');
+    if (!seleccionado) return alert("Selecciona un test en el menú 🚀");
     
     const btn = document.getElementById('btnComenzar');
-    btn.textContent = "CARGANDO...";
-    
+    btn.textContent = "CONECTANDO...";
+
     try {
-        // Petición a la tabla 'preguntas'
-        const data = await supabaseFetch(`preguntas?test_id=eq.${radio.value}&order=numero_orden.asc`);
-        
-        if (!data || data.length === 0) {
-            alert("No hay preguntas en este test.");
-            btn.textContent = "COMENZAR TEST";
-            return;
-        }
+        const res = await fetch(`${SB_URL}/rest/v1/preguntas?test_id=eq.${seleccionado.value}&order=numero_orden.asc`, {
+            headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+        });
+        const data = await res.json();
+
+        if (!data || data.length === 0) throw new Error("La base de datos devolvió 0 preguntas.");
 
         preguntasTest = data.map(p => ({
-            enunciado: p.enunciado || "Sin enunciado",
+            enunciado: p.enunciado,
             opciones: { a: p.opcion_a, b: p.opcion_b, c: p.opcion_c, d: p.opcion_d },
             correcta: (p.correcta || 'a').toLowerCase().trim(),
-            feedback: p.feedback || "Sin explicación."
+            feedback: p.feedback || "Sin explicación disponible."
         }));
-        
-        // Detectar modo
-        const modoEl = document.querySelector('input[name="modo"]:checked');
-        modoEstudio = modoEl ? modoEl.value === 'estudio' : true;
 
-        // --- CAMBIO DE PANTALLAS (IDs EXACTOS) ---
-        document.getElementById('pantalla-inicio').classList.add('hidden');
-        // Ocultamos el footer entero para que desaparezca el botón comenzar
-        document.querySelector('footer.footer-controls').classList.add('hidden'); 
+        modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
+
+        // Gestión manual de visibilidad (Sin classList para evitar fallos de CSS)
+        document.getElementById('pantalla-inicio').style.display = 'none';
+        document.querySelector('.footer-controls').style.display = 'none';
+        document.getElementById('pantalla-test').style.display = 'block';
         document.getElementById('pantalla-test').classList.remove('hidden');
 
         preguntaActualIndex = 0;
         puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
         mostrarPregunta();
     } catch (e) {
-        alert("Error al cargar datos");
+        alert("FALLO CRÍTICO: " + e.message);
+        console.error(e);
     } finally {
         btn.textContent = "COMENZAR TEST";
     }
 };
 
-// 4. MOSTRAR PREGUNTA
+// 4. MOSTRAR PREGUNTA (IDs EXACTOS)
 function mostrarPregunta() {
     esDudada = false;
     document.getElementById('btnArriesgando').classList.remove('active');
@@ -115,81 +100,66 @@ function mostrarPregunta() {
             document.querySelectorAll('.opcion').forEach(b => b.classList.remove('selected'));
             btnOpc.classList.add('selected');
             btnAccion.disabled = false;
-            // Guardamos la función en el botón principal
-            btnAccion.onclick = () => procesarRespuesta(letra);
+            btnAccion.onclick = () => corregir(letra);
         };
         container.appendChild(btnOpc);
     });
 }
 
-// 5. RESPUESTA
-function procesarRespuesta(seleccionada) {
+function corregir(seleccionada) {
     const p = preguntasTest[preguntaActualIndex];
-    const correcta = p.correcta;
-    
     if (esDudada) puntuacion.arriesgadas++;
-    if (seleccionada === correcta) puntuacion.aciertos++;
+    
+    if (seleccionada === p.correcta) puntuacion.aciertos++;
     else puntuacion.fallos++;
-
-    const btnAccion = document.getElementById('btnAccion');
 
     if (modoEstudio) {
         document.querySelectorAll('.opcion').forEach(btn => {
-            const l = btn.querySelector('.letra').textContent.toLowerCase();
-            if (l === correcta) btn.style.background = "#28a745"; 
-            if (l === seleccionada && seleccionada !== correcta) btn.style.background = "#dc3545";
-            btn.style.pointerEvents = "none"; 
+            const letra = btn.querySelector('.letra').textContent.toLowerCase();
+            if (letra === p.correcta) btn.style.background = "#28a745";
+            else if (letra === seleccionada) btn.style.background = "#dc3545";
+            btn.style.pointerEvents = "none";
         });
         document.getElementById('feedback-texto').textContent = p.feedback;
         document.getElementById('feedback-area').classList.remove('hidden');
-        btnAccion.textContent = "SIGUIENTE";
-        btnAccion.onclick = () => siguiente();
+        document.getElementById('btnAccion').textContent = "SIGUIENTE";
+        document.getElementById('btnAccion').onclick = irASiguiente;
     } else {
-        siguiente();
+        irASiguiente();
     }
 }
 
-function siguiente() {
+function irASiguiente() {
     preguntaActualIndex++;
-    if (preguntaActualIndex < preguntasTest.length) {
-        mostrarPregunta();
-    } else {
-        finalizarTest();
-    }
+    if (preguntaActualIndex < preguntasTest.length) mostrarPregunta();
+    else finalizar();
 }
 
-// 6. FINALIZAR
-function finalizarTest() {
-    document.getElementById('pantalla-test').classList.add('hidden');
+function finalizar() {
+    document.getElementById('pantalla-test').style.display = 'none';
     document.getElementById('pantalla-resultados').classList.remove('hidden');
     
     const total = preguntasTest.length;
-    const nulas = total - (puntuacion.aciertos + puntuacion.fallos);
     const nota = ((puntuacion.aciertos - (puntuacion.fallos * 0.33)) * 10 / total).toFixed(2);
 
     document.getElementById('contenedor-stats').innerHTML = `
         <div class="stats-grid">
             <div class="stat-card card-aciertos"><h3>${puntuacion.aciertos}</h3><p>ACIERTOS</p></div>
             <div class="stat-card card-fallos"><h3>${puntuacion.fallos}</h3><p>FALLOS</p></div>
-            <div class="stat-card card-nulas"><h3>${nulas}</h3><p>NULAS</p></div>
             <div class="stat-card card-arriesgadas"><h3>${puntuacion.arriesgadas}</h3><p>DUDADAS</p></div>
         </div>
         <div class="nota-final">NOTA FINAL: ${nota}</div>
     `;
-    
-    document.getElementById('contenedor-boton-volver').innerHTML = `
-        <button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>
-    `;
+    document.getElementById('contenedor-boton-volver').innerHTML = `<button class="btn-main" onclick="location.reload()">INICIO</button>`;
 }
 
-// 7. OTROS EVENTOS (Arriesgar y Salir)
+// 5. EVENTOS VARIOS
 document.getElementById('btnArriesgando').onclick = function() {
     esDudada = !esDudada;
     this.classList.toggle('active', esDudada);
 };
 
-// Buscamos el botón de salir por su clase .btn-exit
-const btnExit = document.querySelector('.btn-exit');
-if (btnExit) btnExit.onclick = () => location.reload();
+const btnS = document.querySelector('.btn-exit');
+if(btnS) btnS.onclick = () => location.reload();
 
-window.onload = cargarMenuDinamico;
+window.onload = cargarMenu;
