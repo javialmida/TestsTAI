@@ -1,112 +1,211 @@
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbwfB5sZE-q22Ha5uvvYM89wFyu74RfVyWM9k2ZA0sg7v9wGtNkCPVr1qM-iPY4UfmNd/exec";
+// --- CONFIGURACIÓN DE SUPABASE ---
+// ¡¡IMPORTANTE!!: Pega aquí tus claves de Supabase (Project Settings -> API)
+const SUPABASE_URL = 'AQUI_TU_PROJECT_URL'; // Ej: https://xyz.supabase.co
+const SUPABASE_KEY = 'AQUI_TU_ANON_KEY';    // Ej: eyJhbGciOiJIUzI1NiIsInR5...
 
-let preguntasTest = [];
-let preguntaActualIndex = 0;
-let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
-let modoEstudio = true;
-let esDudada = false;
+// Inicializamos el cliente (el puente con la base de datos)
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function cargarMenuDinamico() {
-    try {
-        const res = await fetch(`${URL_SCRIPT}?accion=obtenerListaTests`);
-        const texto = await res.text();
-        const data = JSON.parse(texto);
-        
-        ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.innerHTML = "";
-        });
+// --- VARIABLES GLOBALES ---
+let preguntasActuales = [];
+let indicePregunta = 0;
+let aciertos = 0;
+let fallos = 0;
+let testIdActual = null;
 
-        data.forEach(t => {
-            const label = document.createElement('label');
-            label.className = 'test-item';
-            label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombreVisible}</span>`;
-            const idS = t.id.toUpperCase();
-            const cont = (idS.startsWith("EX") || idS.startsWith("SI")) ? document.getElementById('lista-oficiales') : document.getElementById(`lista-B${t.bloque}`);
-            if (cont) cont.appendChild(label);
-        });
-    } catch (e) { console.error("Error cargando menú"); }
+// --- AL CARGAR LA PÁGINA ---
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("Iniciando sistema Opo-Mákina...");
+    await verificarConexion();
+    await cargarListaDeTests();
+});
+
+// 1. Verificar que Supabase responde
+async function verificarConexion() {
+    const { data, error } = await supabaseClient.from('bloques').select('count');
+    const statusElem = document.getElementById('db-status');
+    
+    if (error) {
+        console.error("Error de conexión:", error);
+        statusElem.innerHTML = "Estado: Error conexión ❌";
+        statusElem.style.color = "red";
+    } else {
+        console.log("Conexión establecida con Supabase.");
+        statusElem.innerHTML = "Estado: Conectado a Supabase 🟢";
+        statusElem.style.color = "#39ff14";
+    }
 }
 
-document.getElementById('btnComenzar').onclick = async () => {
-    const sel = document.querySelector('input[name="test-select"]:checked');
-    if (!sel) return alert("Selecciona un test 🚀");
-    const btn = document.getElementById('btnComenzar');
-    btn.textContent = "CARGANDO...";
-    
-    try {
-        const res = await fetch(`${URL_SCRIPT}?idTest=${sel.value}&t=${Date.now()}`);
-        const textoJSON = await res.text();
-        preguntasTest = JSON.parse(textoJSON);
-        
-        modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
-        document.getElementById('pantalla-inicio').classList.add('hidden');
-        if(document.querySelector('.footer-controls')) document.querySelector('.footer-controls').classList.add('hidden');
-        document.getElementById('pantalla-test').classList.remove('hidden');
+// 2. Cargar el desplegable con los tests disponibles en la BD
+async function cargarListaDeTests() {
+    const selector = document.getElementById('test-selector');
+    selector.innerHTML = '<option value="">Cargando...</option>';
 
-        preguntaActualIndex = 0;
-        puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
-        mostrarPregunta();
-    } catch (e) { alert("Error de conexión. Reintenta."); }
-    finally { btn.textContent = "COMENZAR TEST"; }
-};
+    // Pedimos: id y nombre de la tabla 'tests' donde visible sea true
+    const { data: tests, error } = await supabaseClient
+        .from('tests')
+        .select('id, nombre')
+        .eq('visible', true)
+        .order('id', { ascending: true });
 
-function mostrarPregunta() {
-    const p = preguntasTest[preguntaActualIndex];
-    esDudada = false;
-    document.getElementById('btnArriesgando').classList.remove('active');
-    document.getElementById('feedback-area').classList.add('hidden');
-    document.getElementById('contador-preguntas').textContent = `Pregunta ${preguntaActualIndex + 1}/${preguntasTest.length}`;
-    document.getElementById('enunciado').textContent = p.enunciado;
-    const lista = document.getElementById('opciones-lista');
-    lista.innerHTML = "";
-    const btnA = document.getElementById('btnAccion');
-    btnA.disabled = true;
-    btnA.textContent = modoEstudio ? "CORREGIR" : "SIGUIENTE";
+    if (error) {
+        alert("Error cargando tests: " + error.message);
+        return;
+    }
 
-    ["a", "b", "c", "d"].forEach(letra => {
-        const btn = document.createElement('button');
-        btn.className = "opcion";
-        btn.textContent = `${letra}) ${p.opciones[letra]}`; 
-        btn.dataset.letra = letra; 
-        btn.onclick = () => {
-            document.querySelectorAll('.opcion').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            btnA.disabled = false;
-            btnA.onclick = () => procesarRespuesta(letra);
-        };
-        lista.appendChild(btn);
+    // Limpiamos y rellenamos
+    selector.innerHTML = '<option value="">-- Selecciona un Test --</option>';
+    tests.forEach(test => {
+        const option = document.createElement('option');
+        option.value = test.id;
+        option.textContent = test.nombre;
+        selector.appendChild(option);
     });
 }
 
-document.getElementById('btnArriesgando').onclick = function() {
-    esDudada = !esDudada;
-    this.classList.toggle('active', esDudada);
-};
+// 3. Descargar las preguntas del test elegido
+async function cargarPreguntasDelTest() {
+    const selector = document.getElementById('test-selector');
+    testIdActual = selector.value;
 
-function procesarRespuesta(sel) {
-    const p = preguntasTest[preguntaActualIndex];
-    const corr = p.correcta.toLowerCase().trim();
-    if (esDudada) puntuacion.arriesgadas++;
-    if (sel === corr) puntuacion.aciertos++; else puntuacion.fallos++;
+    if (!testIdActual) {
+        alert("Por favor, selecciona un test válido.");
+        return;
+    }
 
-    if (modoEstudio) {
-        document.querySelectorAll('.opcion').forEach(b => {
-            const l = b.dataset.letra;
-            if (l === corr) b.style.background = "#28a745";
-            if (l === sel && sel !== corr) b.style.background = "#dc3545";
-            b.disabled = true;
-        });
-        document.getElementById('feedback-texto').textContent = p.feedback;
-        document.getElementById('feedback-area').classList.remove('hidden');
-        document.getElementById('btnAccion').textContent = "SIGUIENTE";
-        document.getElementById('btnAccion').onclick = () => siguiente();
-    } else { siguiente(); }
+    // Mostrar loading
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('quiz-area').style.display = 'none';
+
+    // CONSULTA A SUPABASE: Dame todas las preguntas de este test_id
+    const { data: preguntas, error } = await supabaseClient
+        .from('preguntas')
+        .select('*')
+        .eq('test_id', testIdActual)
+        .order('numero_orden', { ascending: true }); // Ordenadas por su número
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (error) {
+        alert("Error bajando preguntas: " + error.message);
+        return;
+    }
+
+    if (preguntas.length === 0) {
+        alert("Este test está vacío todavía. ¡Dile a Cifra que meta caña!");
+        return;
+    }
+
+    // Todo listo, empezamos
+    preguntasActuales = preguntas;
+    indicePregunta = 0;
+    aciertos = 0;
+    fallos = 0;
+    mostrarPregunta();
 }
 
-function siguiente() {
-    preguntaActualIndex++;
-    if (preguntaActualIndex < preguntasTest.length) mostrarPregunta();
-    else { alert("Test terminado"); location.reload(); }
+// 4. Pintar la pregunta en pantalla
+function mostrarPregunta() {
+    const pregunta = preguntasActuales[indicePregunta];
+    const quizArea = document.getElementById('quiz-area');
+    quizArea.style.display = 'block';
+
+    // Actualizar contador
+    document.getElementById('question-counter').innerText = 
+        `Pregunta ${indicePregunta + 1} / ${preguntasActuales.length}`;
+
+    // Poner enunciado
+    document.getElementById('question-text').innerText = pregunta.enunciado;
+
+    // Limpiar opciones anteriores
+    const container = document.getElementById('options-container');
+    container.innerHTML = '';
+    
+    // Ocultar feedback y botón siguiente
+    document.getElementById('feedback-area').style.display = 'none';
+    document.getElementById('btn-next').style.display = 'none';
+
+    // Crear botones de opciones (A, B, C, D)
+    const letras = ['a', 'b', 'c', 'd'];
+    letras.forEach(letra => {
+        const textoOpcion = pregunta[`opcion_${letra}`]; // Magia: accede a opcion_a, opcion_b...
+        
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerHTML = `<strong>${letra.toUpperCase()})</strong> ${textoOpcion}`;
+        btn.onclick = () => verificarRespuesta(letra, pregunta.correcta, pregunta.feedback);
+        container.appendChild(btn);
+    });
 }
 
-window.onload = cargarMenuDinamico;
+// 5. Verificar si acertó
+function verificarRespuesta(letraElegida, letraCorrecta, feedbackTexto) {
+    // Bloquear todos los botones para que no pueda cambiar
+    const botones = document.querySelectorAll('.option-btn');
+    botones.forEach(btn => btn.disabled = true);
+
+    const esCorrecta = (letraElegida.toLowerCase() === letraCorrecta.toLowerCase());
+    const feedbackDiv = document.getElementById('feedback-area');
+
+    // Colorear botones
+    botones.forEach(btn => {
+        const letraBtn = btn.innerText.charAt(0).toLowerCase(); // 'a', 'b'...
+        
+        if (letraBtn === letraCorrecta) {
+            btn.classList.add('correct'); // Verde siempre a la correcta
+        }
+        
+        if (letraBtn === letraElegida && !esCorrecta) {
+            btn.classList.add('wrong'); // Rojo si fallaste esta
+        }
+    });
+
+    // Mostrar Feedback
+    feedbackDiv.style.display = 'block';
+    if (esCorrecta) {
+        feedbackDiv.style.border = '1px solid #39ff14';
+        feedbackDiv.innerHTML = `<strong style="color: #39ff14">¡CORRECTO!</strong><br><br>${feedbackTexto || ''}`;
+        aciertos++;
+    } else {
+        feedbackDiv.style.border = '1px solid #ff073a';
+        feedbackDiv.innerHTML = `<strong style="color: #ff073a">¡ERROR!</strong><br><br>${feedbackTexto || ''}`;
+        fallos++;
+    }
+
+    // Guardar intento en BD (Opcional, versión PRO)
+    // guardarEstadistica(esCorrecta);
+
+    // Mostrar botón siguiente
+    document.getElementById('btn-next').style.display = 'inline-block';
+}
+
+// 6. Pasar a la siguiente
+function siguientePregunta() {
+    indicePregunta++;
+    if (indicePregunta < preguntasActuales.length) {
+        mostrarPregunta();
+    } else {
+        finalizarTest();
+    }
+}
+
+// 7. Pantalla final
+function finalizarTest() {
+    const quizArea = document.getElementById('quiz-area');
+    const nota = (aciertos / preguntasActuales.length) * 10;
+    
+    let mensaje = "";
+    if (nota >= 5) mensaje = "¡APROBADO MÁKINA! 🎉";
+    else mensaje = "A estudiar más... 📚";
+
+    quizArea.innerHTML = `
+        <h2 style="color: var(--neon-purple); text-align: center;">TEST FINALIZADO</h2>
+        <div style="text-align: center; font-size: 1.5rem; margin: 30px;">
+            <p>Aciertos: <span style="color: #39ff14">${aciertos}</span></p>
+            <p>Fallos: <span style="color: #ff073a">${fallos}</span></p>
+            <p>Nota: <strong>${nota.toFixed(2)}</strong></p>
+            <h3>${mensaje}</h3>
+            <button class="btn" onclick="location.reload()">VOLVER AL MENÚ</button>
+        </div>
+    `;
+}
