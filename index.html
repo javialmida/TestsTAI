@@ -3,237 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Opo-Mákina TAI | Supabase Edition</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
     
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <style>
-        /* --- ESTILOS MÁKINA (MODO NEÓN) --- */
-        :root {
-            --neon-purple: #b026ff;
-            --neon-green: #39ff14;
-            --neon-red: #ff073a;
-            --dark-bg: #0a0a0a;
-            --panel-bg: #1a1a1a;
-            --text-color: #e0e0e0;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--dark-bg);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        /* TÍTULO GLITCH */
-        h1 {
-            color: var(--neon-purple);
-            text-shadow: 0 0 10px var(--neon-purple);
-            font-size: 2.5rem;
-            margin-bottom: 30px;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            text-align: center;
-        }
-
-        /* CONTENEDOR PRINCIPAL */
-        .container {
-            width: 100%;
-            max-width: 800px;
-            background-color: var(--panel-bg);
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 0 20px rgba(176, 38, 255, 0.2);
-            border: 1px solid #333;
-        }
-
-        /* BARRA DE ESTADO */
-        .stats-bar {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-            color: #888;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
-        }
-
-        /* SELECTOR DE TESTS */
-        label { display: block; margin-bottom: 10px; color: var(--neon-purple); font-weight: bold; }
-        
-        select {
-            background-color: #000;
-            color: #fff;
-            border: 1px solid var(--neon-purple);
-            padding: 12px;
-            border-radius: 5px;
-            width: 100%;
-            font-size: 1.1rem;
-            margin-bottom: 20px;
-            cursor: pointer;
-            outline: none;
-        }
-
-        select:focus { box-shadow: 0 0 10px var(--neon-purple); }
-
-        /* BOTONES GENÉRICOS */
-        .btn {
-            background-color: transparent;
-            color: var(--neon-purple);
-            border: 2px solid var(--neon-purple);
-            padding: 10px 20px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            font-weight: bold;
-            margin-top: 5px;
-            border-radius: 5px;
-            width: 100%;
-        }
-
-        .btn:hover {
-            background-color: var(--neon-purple);
-            color: #fff;
-            box-shadow: 0 0 15px var(--neon-purple);
-        }
-
-        /* CÁPSULA DE PREGUNTA */
-        .question-card {
-            background-color: #222;
-            border-left: 4px solid var(--neon-purple);
-            padding: 20px;
-            margin-top: 20px;
-            border-radius: 0 10px 10px 0;
-            display: none; /* Se oculta hasta cargar */
-            animation: fadeIn 0.5s ease;
-        }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .question-header {
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 15px; 
-            color: var(--neon-purple);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-        }
-
-        .question-text {
-            font-size: 1.3rem;
-            margin-bottom: 25px;
-            line-height: 1.5;
-            font-weight: 500;
-        }
-
-        /* GRILLA DE OPCIONES */
-        .options-grid { display: grid; gap: 12px; }
-
-        .option-btn {
-            background-color: #333;
-            border: 1px solid #444;
-            color: #ccc;
-            padding: 15px;
-            text-align: left;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.2s;
-            font-size: 1.1rem;
-            width: 100%;
-        }
-
-        .option-btn:hover:not(:disabled) {
-            transform: translateX(5px);
-            border-color: var(--neon-purple);
-            background-color: #2a2a2a;
-            color: #fff;
-        }
-
-        /* ESTADOS DE RESPUESTA */
-        .option-btn.correct {
-            background-color: rgba(57, 255, 20, 0.15) !important;
-            border-color: var(--neon-green) !important;
-            color: var(--neon-green) !important;
-        }
-
-        .option-btn.wrong {
-            background-color: rgba(255, 7, 58, 0.15) !important;
-            border-color: var(--neon-red) !important;
-            color: var(--neon-red) !important;
-        }
-
-        /* FEEDBACK */
-        #feedback-area {
-            margin-top: 25px;
-            padding: 20px;
-            border-radius: 8px;
-            background-color: #2a2a2a;
-            border: 1px dashed #555;
-            display: none;
-            font-size: 1rem;
-            line-height: 1.6;
-        }
-
-        /* LOADING */
-        #loading {
-            text-align: center;
-            color: var(--neon-purple);
-            display: none;
-            margin: 20px 0;
-            font-style: italic;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-
-    </style>
+    <title>Portal Tests TAI</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <h1>OPO-MÁKINA TAI</h1>
-
     <div class="container">
-        <div class="stats-bar">
-            <span id="user-info">👤 Usuario: Mákina</span>
-            <span id="db-status">Estado: Desconectado 🔴</span>
-        </div>
+        <header>
+            <h1>TESTS TAI</h1>
+            <div class="header-buttons">
+                <button id="btnEstadisticas" class="btn-main" style="padding: 10px 20px;">ESTADÍSTICAS</button>
+            </div>
+        </header>
 
-        <div id="selector-area">
-            <label for="test-selector">📂 SELECCIONA TU BATALLA:</label>
-            <select id="test-selector">
-                <option value="">Conectando con Supabase...</option>
-            </select>
-            <button class="btn" onclick="cargarPreguntasDelTest()">🚀 COMENZAR TEST</button>
-        </div>
+        <main class="grid-sections" id="pantalla-inicio">
+            <section class="section-box">
+                <h2>TESTS POR TEMA</h2>
+                <div class="acordeon" id="acordeon-temas">
+                    <details class="bloque" id="bloque-1">
+                        <summary>BLOQUE 1 - Organización del Estado</summary>
+                        <div class="test-list" id="lista-B1">
+                            <p class="loading-text">Buscando tests...</p>
+                        </div>
+                    </details>
+                    <details class="bloque" id="bloque-2">
+                        <summary>BLOQUE 2 - Tecnología Básica</summary>
+                        <div class="test-list" id="lista-B2"></div>
+                    </details>
+                    <details class="bloque" id="bloque-3">
+                        <summary>BLOQUE 3 - Desarrollo de Sistemas</summary>
+                        <div class="test-list" id="lista-B3"></div>
+                    </details>
+                    <details class="bloque" id="bloque-4">
+                        <summary>BLOQUE 4 - Redes y Seguridad</summary>
+                        <div class="test-list" id="lista-B4"></div>
+                    </details>
+                </div>
+            </section>
 
-        <div id="loading">CONECTANDO A LA MATRIX... 📶</div>
+            <section class="section-box">
+                <h2>OFICIALES Y SIMULACROS</h2>
+                <div class="exam-grid" id="lista-oficiales">
+                    <p class="loading-text">No hay exámenes disponibles</p>
+                </div>
+            </section>
+        </main>
 
-        <div id="quiz-area" class="question-card">
-            <div class="question-header">
-                <span id="question-counter">PREGUNTA 1</span>
-                <span>TAI 2025</span>
+        <section id="pantalla-test" class="hidden">
+            <div class="test-header">
+                <span id="contador-preguntas">Pregunta 1/X</span>
+                <button id="btnSalir" class="btn-danger">SALIR</button>
             </div>
             
-            <div id="question-text" class="question-text">
-                </div>
-
-            <div class="options-grid" id="options-container">
-                </div>
-
-            <div id="feedback-area"></div>
-            
-            <div style="margin-top: 25px; text-align: right;">
-                <button class="btn" id="btn-next" style="display: none; width: auto;" onclick="siguientePregunta()">SIGUIENTE >></button>
+            <div class="pregunta-box">
+                <p id="enunciado">Cargando pregunta...</p>
             </div>
+
+            <div id="opciones-lista"></div>
+
+            <div class="controls-container" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <button id="btnArriesgando" class="btn-warning">¿DUDAS? (ARRIESGANDO)</button>
+            </div>
+
+            <div class="test-footer">
+                <button id="btnAccion" class="btn-main" disabled>CORREGIR</button>
+            </div>
+            
+            <div id="feedback-area" class="hidden">
+                <p id="feedback-texto"></p>
+            </div>
+        </section>
+
+        <footer class="footer-controls">
+            <div class="modo-selector">
+                <label class="radio-option">
+                    <input type="radio" name="modo" value="estudio" checked> 
+                    <span>MODO ESTUDIO</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="modo" value="examen"> 
+                    <span>MODO EXAMEN</span>
+                </label>
+            </div>
+            <button id="btnComenzar" class="btn-main">COMENZAR TEST</button>
+        </footer>
+
+        <div id="pantalla-resultados" class="hidden container">
+            <h2 style="text-align: center; color: #7b2cbf; margin-bottom: 20px;">RESUMEN DEL TEST</h2>
+            <div id="contenedor-stats"></div>
+            <div id="contenedor-informe" class="informe-estilo"></div>
+            <div id="contenedor-boton-volver" class="container-volver"></div>
         </div>
+        
+        <div id="pantalla-estadisticas" class="hidden container"></div>
     </div>
-
+    
     <script src="script.js"></script>
 </body>
 </html>
