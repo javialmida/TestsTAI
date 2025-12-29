@@ -1,9 +1,11 @@
 // --- CONFIGURACIÓN DE SUPABASE ---
-// ¡¡IMPORTANTE!!: Pega aquí tus claves de Supabase (Project Settings -> API)
-const SUPABASE_URL = 'AQUI_TU_PROJECT_URL'; // Ej: https://xyz.supabase.co
-const SUPABASE_KEY = 'AQUI_TU_ANON_KEY';    // Ej: eyJhbGciOiJIUzI1NiIsInR5...
+// URL de tu proyecto
+const SUPABASE_URL = 'https://ogpprghtohbumqihzxwt.supabase.co'; 
 
-// Inicializamos el cliente (el puente con la base de datos)
+// Tu "Chorizo" (Anon Public Key) - ¡La buena!
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI';    
+
+// Inicializamos el cliente
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- VARIABLES GLOBALES ---
@@ -15,33 +17,35 @@ let testIdActual = null;
 
 // --- AL CARGAR LA PÁGINA ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("Iniciando sistema Opo-Mákina...");
+    console.log("Iniciando sistema Opo-Mákina (Modo Cerveza ON 🍺)...");
     await verificarConexion();
     await cargarListaDeTests();
 });
 
 // 1. Verificar que Supabase responde
 async function verificarConexion() {
-    const { data, error } = await supabaseClient.from('bloques').select('count');
     const statusElem = document.getElementById('db-status');
+    
+    // Consulta ligera de prueba
+    const { data, error } = await supabaseClient.from('bloques').select('count');
     
     if (error) {
         console.error("Error de conexión:", error);
         statusElem.innerHTML = "Estado: Error conexión ❌";
         statusElem.style.color = "red";
     } else {
-        console.log("Conexión establecida con Supabase.");
+        console.log("¡Conexión establecida con éxito!");
         statusElem.innerHTML = "Estado: Conectado a Supabase 🟢";
         statusElem.style.color = "#39ff14";
     }
 }
 
-// 2. Cargar el desplegable con los tests disponibles en la BD
+// 2. Cargar el desplegable con los tests disponibles
 async function cargarListaDeTests() {
     const selector = document.getElementById('test-selector');
     selector.innerHTML = '<option value="">Cargando...</option>';
 
-    // Pedimos: id y nombre de la tabla 'tests' donde visible sea true
+    // Pedimos los tests visibles
     const { data: tests, error } = await supabaseClient
         .from('tests')
         .select('id, nombre')
@@ -49,18 +53,23 @@ async function cargarListaDeTests() {
         .order('id', { ascending: true });
 
     if (error) {
-        alert("Error cargando tests: " + error.message);
+        console.error("Error cargando tests:", error);
+        selector.innerHTML = '<option value="">Error cargando lista</option>';
         return;
     }
 
     // Limpiamos y rellenamos
     selector.innerHTML = '<option value="">-- Selecciona un Test --</option>';
-    tests.forEach(test => {
-        const option = document.createElement('option');
-        option.value = test.id;
-        option.textContent = test.nombre;
-        selector.appendChild(option);
-    });
+    if (tests && tests.length > 0) {
+        tests.forEach(test => {
+            const option = document.createElement('option');
+            option.value = test.id;
+            option.textContent = test.nombre;
+            selector.appendChild(option);
+        });
+    } else {
+        selector.innerHTML = '<option value="">No hay tests visibles</option>';
+    }
 }
 
 // 3. Descargar las preguntas del test elegido
@@ -73,16 +82,16 @@ async function cargarPreguntasDelTest() {
         return;
     }
 
-    // Mostrar loading
+    // UI Loading
     document.getElementById('loading').style.display = 'block';
     document.getElementById('quiz-area').style.display = 'none';
 
-    // CONSULTA A SUPABASE: Dame todas las preguntas de este test_id
+    // Consulta a la tabla preguntas
     const { data: preguntas, error } = await supabaseClient
         .from('preguntas')
         .select('*')
         .eq('test_id', testIdActual)
-        .order('numero_orden', { ascending: true }); // Ordenadas por su número
+        .order('numero_orden', { ascending: true });
 
     document.getElementById('loading').style.display = 'none';
 
@@ -91,12 +100,11 @@ async function cargarPreguntasDelTest() {
         return;
     }
 
-    if (preguntas.length === 0) {
-        alert("Este test está vacío todavía. ¡Dile a Cifra que meta caña!");
+    if (!preguntas || preguntas.length === 0) {
+        alert("Este test está vacío. ¡Dile a Cifra que meta más preguntas!");
         return;
     }
 
-    // Todo listo, empezamos
     preguntasActuales = preguntas;
     indicePregunta = 0;
     aciertos = 0;
@@ -104,31 +112,31 @@ async function cargarPreguntasDelTest() {
     mostrarPregunta();
 }
 
-// 4. Pintar la pregunta en pantalla
+// 4. Pintar la pregunta
 function mostrarPregunta() {
     const pregunta = preguntasActuales[indicePregunta];
     const quizArea = document.getElementById('quiz-area');
     quizArea.style.display = 'block';
 
-    // Actualizar contador
+    // Contador
     document.getElementById('question-counter').innerText = 
         `Pregunta ${indicePregunta + 1} / ${preguntasActuales.length}`;
 
-    // Poner enunciado
+    // Enunciado
     document.getElementById('question-text').innerText = pregunta.enunciado;
 
-    // Limpiar opciones anteriores
+    // Opciones
     const container = document.getElementById('options-container');
     container.innerHTML = '';
     
-    // Ocultar feedback y botón siguiente
+    // Resetear visuales
     document.getElementById('feedback-area').style.display = 'none';
     document.getElementById('btn-next').style.display = 'none';
 
-    // Crear botones de opciones (A, B, C, D)
     const letras = ['a', 'b', 'c', 'd'];
     letras.forEach(letra => {
-        const textoOpcion = pregunta[`opcion_${letra}`]; // Magia: accede a opcion_a, opcion_b...
+        // Accedemos dinámicamente: opcion_a, opcion_b...
+        const textoOpcion = pregunta[`opcion_${letra}`];
         
         const btn = document.createElement('button');
         btn.className = 'option-btn';
@@ -138,29 +146,29 @@ function mostrarPregunta() {
     });
 }
 
-// 5. Verificar si acertó
+// 5. Verificar respuesta
 function verificarRespuesta(letraElegida, letraCorrecta, feedbackTexto) {
-    // Bloquear todos los botones para que no pueda cambiar
+    // Bloquear botones
     const botones = document.querySelectorAll('.option-btn');
     botones.forEach(btn => btn.disabled = true);
 
     const esCorrecta = (letraElegida.toLowerCase() === letraCorrecta.toLowerCase());
     const feedbackDiv = document.getElementById('feedback-area');
 
-    // Colorear botones
+    // Colorear
     botones.forEach(btn => {
-        const letraBtn = btn.innerText.charAt(0).toLowerCase(); // 'a', 'b'...
+        const letraBtn = btn.innerText.charAt(0).toLowerCase();
         
         if (letraBtn === letraCorrecta) {
-            btn.classList.add('correct'); // Verde siempre a la correcta
+            btn.classList.add('correct');
         }
         
         if (letraBtn === letraElegida && !esCorrecta) {
-            btn.classList.add('wrong'); // Rojo si fallaste esta
+            btn.classList.add('wrong');
         }
     });
 
-    // Mostrar Feedback
+    // Feedback
     feedbackDiv.style.display = 'block';
     if (esCorrecta) {
         feedbackDiv.style.border = '1px solid #39ff14';
@@ -172,14 +180,10 @@ function verificarRespuesta(letraElegida, letraCorrecta, feedbackTexto) {
         fallos++;
     }
 
-    // Guardar intento en BD (Opcional, versión PRO)
-    // guardarEstadistica(esCorrecta);
-
-    // Mostrar botón siguiente
     document.getElementById('btn-next').style.display = 'inline-block';
 }
 
-// 6. Pasar a la siguiente
+// 6. Siguiente pregunta
 function siguientePregunta() {
     indicePregunta++;
     if (indicePregunta < preguntasActuales.length) {
@@ -189,13 +193,13 @@ function siguientePregunta() {
     }
 }
 
-// 7. Pantalla final
+// 7. Finalizar
 function finalizarTest() {
     const quizArea = document.getElementById('quiz-area');
     const nota = (aciertos / preguntasActuales.length) * 10;
     
     let mensaje = "";
-    if (nota >= 5) mensaje = "¡APROBADO MÁKINA! 🎉";
+    if (nota >= 5) mensaje = "¡APROBADO MÁKINA! 🎉🍺";
     else mensaje = "A estudiar más... 📚";
 
     quizArea.innerHTML = `
