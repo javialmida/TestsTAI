@@ -1,215 +1,178 @@
-// --- CONFIGURACIÓN DE SUPABASE ---
-// URL de tu proyecto
-const SUPABASE_URL = 'https://ogpprghtohbumqihzxwt.supabase.co'; 
+// 1. CONFIGURACIÓN SUPABASE
+const SUPABASE_URL = "https://ogpprghtohbumqihzxwt.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI";
 
-// Tu "Chorizo" (Anon Public Key) - ¡La buena!
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI';    
+let preguntasTest = [];
+let preguntaActualIndex = 0;
+let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
+let modoEstudio = true;
+let esDudada = false;
 
-// Inicializamos el cliente
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// --- VARIABLES GLOBALES ---
-let preguntasActuales = [];
-let indicePregunta = 0;
-let aciertos = 0;
-let fallos = 0;
-let testIdActual = null;
-
-// --- AL CARGAR LA PÁGINA ---
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log("Iniciando sistema Opo-Mákina (Modo Cerveza ON 🍺)...");
-    await verificarConexion();
-    await cargarListaDeTests();
-});
-
-// 1. Verificar que Supabase responde
-async function verificarConexion() {
-    const statusElem = document.getElementById('db-status');
-    
-    // Consulta ligera de prueba
-    const { data, error } = await supabaseClient.from('bloques').select('count');
-    
-    if (error) {
-        console.error("Error de conexión:", error);
-        statusElem.innerHTML = "Estado: Error conexión ❌";
-        statusElem.style.color = "red";
-    } else {
-        console.log("¡Conexión establecida con éxito!");
-        statusElem.innerHTML = "Estado: Conectado a Supabase 🟢";
-        statusElem.style.color = "#39ff14";
-    }
+// Función para hablar con Supabase sin librerías externas
+async function supabaseFetch(endpoint) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+        headers: {
+            "apikey": SUPABASE_KEY,
+            "Authorization": `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+    });
+    if (!res.ok) throw new Error(`Error Supabase: ${res.statusText}`);
+    return await res.json();
 }
 
-// 2. Cargar el desplegable con los tests disponibles
-async function cargarListaDeTests() {
-    const selector = document.getElementById('test-selector');
-    selector.innerHTML = '<option value="">Cargando...</option>';
-
-    // Pedimos los tests visibles
-    const { data: tests, error } = await supabaseClient
-        .from('tests')
-        .select('id, nombre')
-        .eq('visible', true)
-        .order('id', { ascending: true });
-
-    if (error) {
-        console.error("Error cargando tests:", error);
-        selector.innerHTML = '<option value="">Error cargando lista</option>';
-        return;
-    }
-
-    // Limpiamos y rellenamos
-    selector.innerHTML = '<option value="">-- Selecciona un Test --</option>';
-    if (tests && tests.length > 0) {
-        tests.forEach(test => {
-            const option = document.createElement('option');
-            option.value = test.id;
-            option.textContent = test.nombre;
-            selector.appendChild(option);
-        });
-    } else {
-        selector.innerHTML = '<option value="">No hay tests visibles</option>';
-    }
-}
-
-// 3. Descargar las preguntas del test elegido
-async function cargarPreguntasDelTest() {
-    const selector = document.getElementById('test-selector');
-    testIdActual = selector.value;
-
-    if (!testIdActual) {
-        alert("Por favor, selecciona un test válido.");
-        return;
-    }
-
-    // UI Loading
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('quiz-area').style.display = 'none';
-
-    // Consulta a la tabla preguntas
-    const { data: preguntas, error } = await supabaseClient
-        .from('preguntas')
-        .select('*')
-        .eq('test_id', testIdActual)
-        .order('numero_orden', { ascending: true });
-
-    document.getElementById('loading').style.display = 'none';
-
-    if (error) {
-        alert("Error bajando preguntas: " + error.message);
-        return;
-    }
-
-    if (!preguntas || preguntas.length === 0) {
-        alert("Este test está vacío. ¡Dile a Cifra que meta más preguntas!");
-        return;
-    }
-
-    preguntasActuales = preguntas;
-    indicePregunta = 0;
-    aciertos = 0;
-    fallos = 0;
-    mostrarPregunta();
-}
-
-// 4. Pintar la pregunta
-function mostrarPregunta() {
-    const pregunta = preguntasActuales[indicePregunta];
-    const quizArea = document.getElementById('quiz-area');
-    quizArea.style.display = 'block';
-
-    // Contador
-    document.getElementById('question-counter').innerText = 
-        `Pregunta ${indicePregunta + 1} / ${preguntasActuales.length}`;
-
-    // Enunciado
-    document.getElementById('question-text').innerText = pregunta.enunciado;
-
-    // Opciones
-    const container = document.getElementById('options-container');
-    container.innerHTML = '';
-    
-    // Resetear visuales
-    document.getElementById('feedback-area').style.display = 'none';
-    document.getElementById('btn-next').style.display = 'none';
-
-    const letras = ['a', 'b', 'c', 'd'];
-    letras.forEach(letra => {
-        // Accedemos dinámicamente: opcion_a, opcion_b...
-        const textoOpcion = pregunta[`opcion_${letra}`];
+// 2. CARGA DEL MENÚ (Respeta tus listas B1, B2, B3, B4)
+async function cargarMenuDinamico() {
+    try {
+        const data = await supabaseFetch("tests?select=id,nombre,bloque_id&visible=eq.true");
         
+        // Limpiamos los contenedores originales de tu index.html
+        ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = "";
+        });
+
+        data.forEach(t => {
+            const label = document.createElement('label');
+            label.className = 'test-item';
+            label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombre}</span>`;
+            
+            // Si bloque_id es 1 va a lista-B1, etc.
+            const contenedorId = t.bloque_id === 5 ? 'lista-oficiales' : `lista-B${t.bloque_id}`;
+            const contenedor = document.getElementById(contenedorId);
+            if (contenedor) contenedor.appendChild(label);
+        });
+    } catch (e) { console.error("Error cargando menú:", e); }
+}
+
+// 3. COMENZAR TEST (Tu lógica original de cambio de pantalla)
+document.getElementById('btnComenzar').onclick = async () => {
+    const sel = document.querySelector('input[name="test-select"]:checked');
+    if (!sel) return alert("Selecciona un test 🚀");
+    
+    const btn = document.getElementById('btnComenzar');
+    btn.textContent = "CARGANDO...";
+    
+    try {
+        const data = await supabaseFetch(`preguntas?test_id=eq.${sel.value}&order=numero_orden.asc`);
+        
+        preguntasTest = data.map(p => ({
+            enunciado: p.enunciado,
+            opciones: { a: p.opcion_a, b: p.opcion_b, c: p.opcion_c, d: p.opcion_d },
+            correcta: p.correcta,
+            feedback: p.feedback || "Sin explicación disponible."
+        }));
+        
+        modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
+        document.getElementById('pantalla-inicio').classList.add('hidden');
+        document.getElementById('pantalla-test').classList.remove('hidden');
+
+        preguntaActualIndex = 0;
+        puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
+        mostrarPregunta();
+    } catch (e) {
+        alert("Error al conectar con Supabase.");
+    } finally {
+        btn.textContent = "COMENZAR TEST";
+    }
+};
+
+// 4. MOSTRAR PREGUNTA (Tus IDs originales: pregunta-texto, opciones-container...)
+function mostrarPregunta() {
+    esDudada = false;
+    document.getElementById('btnArriesgando').classList.remove('active');
+    document.getElementById('feedback-area').classList.add('hidden');
+    
+    const p = preguntasTest[preguntaActualIndex];
+    document.getElementById('pregunta-numero').textContent = `Pregunta ${preguntaActualIndex + 1} de ${preguntasTest.length}`;
+    document.getElementById('pregunta-texto').textContent = p.enunciado;
+    
+    const container = document.getElementById('opciones-container');
+    container.innerHTML = "";
+    document.getElementById('btnAccion').disabled = true;
+    document.getElementById('btnAccion').textContent = "CORREGIR";
+
+    Object.entries(p.opciones).forEach(([letra, texto]) => {
+        if (!texto) return;
         const btn = document.createElement('button');
-        btn.className = 'option-btn';
-        btn.innerHTML = `<strong>${letra.toUpperCase()})</strong> ${textoOpcion}`;
-        btn.onclick = () => verificarRespuesta(letra, pregunta.correcta, pregunta.feedback);
+        btn.className = 'opcion';
+        btn.dataset.letra = letra;
+        btn.innerHTML = `<span class="letra">${letra.toUpperCase()}</span> ${texto}`;
+        btn.onclick = () => {
+            document.querySelectorAll('.opcion').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            document.getElementById('btnAccion').disabled = false;
+            document.getElementById('btnAccion').onclick = () => procesarRespuesta(letra);
+        };
         container.appendChild(btn);
     });
 }
 
-// 5. Verificar respuesta
-function verificarRespuesta(letraElegida, letraCorrecta, feedbackTexto) {
-    // Bloquear botones
-    const botones = document.querySelectorAll('.option-btn');
-    botones.forEach(btn => btn.disabled = true);
+// 5. BOTÓN ARRIESGANDO
+document.getElementById('btnArriesgando').onclick = function() {
+    esDudada = !esDudada;
+    this.classList.toggle('active', esDudada);
+};
 
-    const esCorrecta = (letraElegida.toLowerCase() === letraCorrecta.toLowerCase());
-    const feedbackDiv = document.getElementById('feedback-area');
+// 6. PROCESAR RESPUESTA (Colores y lógica de puntuación original)
+function procesarRespuesta(seleccionada) {
+    const p = preguntasTest[preguntaActualIndex];
+    const correcta = p.correcta.toLowerCase().trim();
+    
+    if (esDudada) puntuacion.arriesgadas++;
+    if (seleccionada === correcta) puntuacion.aciertos++;
+    else puntuacion.fallos++;
 
-    // Colorear
-    botones.forEach(btn => {
-        const letraBtn = btn.innerText.charAt(0).toLowerCase();
-        
-        if (letraBtn === letraCorrecta) {
-            btn.classList.add('correct');
-        }
-        
-        if (letraBtn === letraElegida && !esCorrecta) {
-            btn.classList.add('wrong');
-        }
-    });
-
-    // Feedback
-    feedbackDiv.style.display = 'block';
-    if (esCorrecta) {
-        feedbackDiv.style.border = '1px solid #39ff14';
-        feedbackDiv.innerHTML = `<strong style="color: #39ff14">¡CORRECTO!</strong><br><br>${feedbackTexto || ''}`;
-        aciertos++;
+    if (modoEstudio) {
+        document.querySelectorAll('.opcion').forEach(btn => {
+            const l = btn.dataset.letra; 
+            if (l === correcta) btn.style.background = "#28a745"; 
+            if (l === seleccionada && seleccionada !== correcta) btn.style.background = "#dc3545";
+            btn.disabled = true; 
+        });
+        document.getElementById('feedback-texto').textContent = p.feedback;
+        document.getElementById('feedback-area').classList.remove('hidden');
+        document.getElementById('btnAccion').textContent = "SIGUIENTE";
+        document.getElementById('btnAccion').onclick = () => siguiente();
     } else {
-        feedbackDiv.style.border = '1px solid #ff073a';
-        feedbackDiv.innerHTML = `<strong style="color: #ff073a">¡ERROR!</strong><br><br>${feedbackTexto || ''}`;
-        fallos++;
+        siguiente();
     }
-
-    document.getElementById('btn-next').style.display = 'inline-block';
 }
 
-// 6. Siguiente pregunta
-function siguientePregunta() {
-    indicePregunta++;
-    if (indicePregunta < preguntasActuales.length) {
+function siguiente() {
+    preguntaActualIndex++;
+    if (preguntaActualIndex < preguntasTest.length) {
         mostrarPregunta();
     } else {
         finalizarTest();
     }
 }
 
-// 7. Finalizar
+// 7. FINALIZAR TEST (Vuelve el resumen "Guapo" con las stats-grid)
 function finalizarTest() {
-    const quizArea = document.getElementById('quiz-area');
-    const nota = (aciertos / preguntasActuales.length) * 10;
+    document.getElementById('pantalla-test').classList.add('hidden');
+    document.getElementById('pantalla-resultados').classList.remove('hidden');
     
-    let mensaje = "";
-    if (nota >= 5) mensaje = "¡APROBADO MÁKINA! 🎉🍺";
-    else mensaje = "A estudiar más... 📚";
+    const total = preguntasTest.length;
+    const nulas = total - (puntuacion.aciertos + puntuacion.fallos);
+    const nota = ((puntuacion.aciertos - (puntuacion.fallos * 0.33)) * 10 / total).toFixed(2);
 
-    quizArea.innerHTML = `
-        <h2 style="color: var(--neon-purple); text-align: center;">TEST FINALIZADO</h2>
-        <div style="text-align: center; font-size: 1.5rem; margin: 30px;">
-            <p>Aciertos: <span style="color: #39ff14">${aciertos}</span></p>
-            <p>Fallos: <span style="color: #ff073a">${fallos}</span></p>
-            <p>Nota: <strong>${nota.toFixed(2)}</strong></p>
-            <h3>${mensaje}</h3>
-            <button class="btn" onclick="location.reload()">VOLVER AL MENÚ</button>
+    const statsHTML = `
+        <div class="stats-grid">
+            <div class="stat-card card-aciertos"><h3>${puntuacion.aciertos}</h3><p>ACIERTOS</p></div>
+            <div class="stat-card card-fallos"><h3>${puntuacion.fallos}</h3><p>FALLOS</p></div>
+            <div class="stat-card card-nulas"><h3>${nulas}</h3><p>NULAS</p></div>
+            <div class="stat-card card-arriesgadas"><h3>${puntuacion.arriesgadas}</h3><p>DUDADAS</p></div>
         </div>
+        <div class="nota-final">NOTA FINAL: ${nota}</div>
+    `;
+    
+    document.getElementById('contenedor-stats').innerHTML = statsHTML;
+    document.getElementById('contenedor-boton-volver').innerHTML = `
+        <button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>
     `;
 }
+
+// Inicio
+window.onload = cargarMenuDinamico;
