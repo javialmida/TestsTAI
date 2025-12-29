@@ -1,4 +1,3 @@
-// 1. CONFIGURACIÓN SUPABASE
 const SB_URL = "https://ogpprghtohbumqihzxwt.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI";
 
@@ -137,42 +136,41 @@ function finalizarTest() {
     const total = preguntasTest.length;
     const nota = ((puntuacion.aciertos - (puntuacion.fallos * 0.33)) * 10 / total).toFixed(2);
 
-    // ESTRUCTURA DE CÁPSULAS EN HORIZONTAL
+    // INYECCIÓN DE CÁPSULAS HORIZONTALES
     document.getElementById('contenedor-stats').innerHTML = `
-        <div class="stats-grid">
+        <div class="resumen-stats">
             <div class="stat-card card-aciertos"><h3>${puntuacion.aciertos}</h3><p>ACIERTOS</p></div>
             <div class="stat-card card-fallos"><h3>${puntuacion.fallos}</h3><p>FALLOS</p></div>
             <div class="stat-card card-dudas"><h3>${puntuacion.arriesgadas}</h3><p>DUDADAS</p></div>
         </div>
-        <div class="nota-final" style="text-align:center; margin: 20px 0; font-size: 1.5rem;">NOTA FINAL: ${nota}</div>
+        <div class="caja-brillo-celeste">
+            <div class="porcentaje-celeste">${nota}</div>
+            <p style="margin:0; font-weight:bold;">NOTA FINAL</p>
+        </div>
     `;
 
     const informeContenedor = document.getElementById('contenedor-informe');
     informeContenedor.innerHTML = "";
-    
     const fallosODudas = respuestasUsuario.filter(r => !r.esCorrecta || r.dudada);
     
     if (fallosODudas.length > 0) {
-        informeContenedor.innerHTML = `<h3 style="color: #9c4dcc; margin: 20px 0;">REVISIÓN DE FALLOS Y DUDAS</h3>`;
+        informeContenedor.innerHTML = `<h3 style="color: #9c4dcc; margin: 20px 0; text-align:center;">REVISIÓN</h3>`;
         fallosODudas.forEach((r, idx) => {
             const item = document.createElement('div');
             item.className = 'revision-item';
             const colorBorde = r.esCorrecta ? "#f1c40f" : "#dc3545";
-            item.setAttribute('style', `border-left: 5px solid ${colorBorde}; background: #252525; padding: 15px; margin-bottom: 15px; border-radius: 8px; text-align: left;`);
-            
+            item.style.borderLeft = `5px solid ${colorBorde}`;
             item.innerHTML = `
                 <p><strong>${idx + 1}. ${r.pregunta}</strong></p>
-                <p style="color: ${r.esCorrecta ? '#28a745' : '#dc3545'}; margin: 5px 0;">Tu respuesta: ${r.seleccionada.toUpperCase()} - ${r.opciones[r.seleccionada]}</p>
-                ${!r.esCorrecta ? `<p style="color: #28a745; margin: 5px 0;">Correcta: ${r.correcta.toUpperCase()} - ${r.opciones[r.correcta]}</p>` : ''}
-                <div style="background: #111; padding: 10px; border-radius: 4px; margin-top: 10px; font-style: italic; font-size: 0.9em; color: #bbb;">
-                    💡 ${r.feedback}
-                </div>
+                <p style="color: ${r.esCorrecta ? '#28a745' : '#dc3545'};">Tu respuesta: ${r.seleccionada.toUpperCase()}</p>
+                ${!r.esCorrecta ? `<p style="color: #28a745;">Correcta: ${r.correcta.toUpperCase()}</p>` : ''}
+                <div style="font-size: 0.9em; color: #bbb; margin-top: 10px;">💡 ${r.feedback}</div>
             `;
             informeContenedor.appendChild(item);
         });
     }
 
-    document.getElementById('contenedor-boton-volver').innerHTML = `<button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>`;
+    document.getElementById('contenedor-boton-volver').innerHTML = `<button class="btn-main" style="display:block; margin: 20px auto;" onclick="location.reload()">VOLVER AL INICIO</button>`;
 }
 
 document.getElementById('btnArriesgando').onclick = function() {
@@ -180,5 +178,4 @@ document.getElementById('btnArriesgando').onclick = function() {
     this.classList.toggle('active', esDudada);
 };
 document.getElementById('btnSalir').onclick = () => location.reload();
-
 window.onload = cargarMenuDinamico;
