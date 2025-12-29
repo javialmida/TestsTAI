@@ -1,4 +1,4 @@
-// 1. CONFIGURACIÓN SUPABASE (Mantengo tus credenciales intactas)
+// 1. CONFIGURACIÓN SUPABASE
 const SB_URL = "https://ogpprghtohbumqihzxwt.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncHByZ2h0b2hidW1xaWh6eHd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcwMTA5MDMsImV4cCI6MjA4MjU4NjkwM30.TDkm0NHDNh0gec26s6gnvHH_euJPuGLqX5nghMXy2wI";
 
@@ -26,7 +26,7 @@ async function cargarMenuDinamico() {
         data.forEach(t => {
             const label = document.createElement('label');
             label.className = 'test-item';
-            label.innerHTML = `<input type="radio" name="test-select" value="${t.id}" data-nombre="${t.nombre}"> <span>${t.nombre}</span>`;
+            label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombre}</span>`;
             const cId = t.bloque_id === 5 ? 'lista-oficiales' : `lista-B${t.bloque_id}`;
             if (document.getElementById(cId)) document.getElementById(cId).appendChild(label);
         });
@@ -111,8 +111,8 @@ function procesarRespuesta(seleccionada) {
     if (modoEstudio) {
         document.querySelectorAll('.opcion').forEach(btn => {
             const l = btn.querySelector('.letra').textContent.toLowerCase();
-            if (l === p.correcta) btn.className = 'opcion correct'; 
-            if (l === seleccionada && !esCorrecta) btn.className = 'opcion incorrect';
+            if (l === p.correcta) btn.style.background = "#28a745"; 
+            if (l === seleccionada && !esCorrecta) btn.style.background = "#dc3545";
             btn.style.pointerEvents = "none";
         });
         document.getElementById('feedback-texto').textContent = p.feedback;
@@ -137,79 +137,42 @@ function finalizarTest() {
     const total = preguntasTest.length;
     const nota = ((puntuacion.aciertos - (puntuacion.fallos * 0.33)) * 10 / total).toFixed(2);
 
-    // 1. CAPSULAS EN HORIZONTAL (Usando tus clases exactas)
+    // ESTRUCTURA DE CÁPSULAS EN HORIZONTAL
     document.getElementById('contenedor-stats').innerHTML = `
         <div class="stats-grid">
             <div class="stat-card card-aciertos"><h3>${puntuacion.aciertos}</h3><p>ACIERTOS</p></div>
             <div class="stat-card card-fallos"><h3>${puntuacion.fallos}</h3><p>FALLOS</p></div>
             <div class="stat-card card-dudas"><h3>${puntuacion.arriesgadas}</h3><p>DUDADAS</p></div>
         </div>
-        <div class="nota-final" style="text-align:center; font-size: 2rem; margin: 20px 0; color: #7b2cbf;">${nota}</div>
+        <div class="nota-final" style="text-align:center; margin: 20px 0; font-size: 1.5rem;">NOTA FINAL: ${nota}</div>
     `;
 
-    // 2. INFORME FINAL (Feedback de errores)
     const informeContenedor = document.getElementById('contenedor-informe');
     informeContenedor.innerHTML = "";
     
     const fallosODudas = respuestasUsuario.filter(r => !r.esCorrecta || r.dudada);
     
     if (fallosODudas.length > 0) {
-        const h3 = document.createElement('h3');
-        h3.style.color = "#9c4dcc";
-        h3.style.textAlign = "center";
-        h3.textContent = "REVISIÓN DE FALLOS Y DUDAS";
-        informeContenedor.appendChild(h3);
-
+        informeContenedor.innerHTML = `<h3 style="color: #9c4dcc; margin: 20px 0;">REVISIÓN DE FALLOS Y DUDAS</h3>`;
         fallosODudas.forEach((r, idx) => {
-            const div = document.createElement('div');
-            div.className = "revision-item";
-            // Usamos colores de tu CSS para el borde lateral
+            const item = document.createElement('div');
+            item.className = 'revision-item';
             const colorBorde = r.esCorrecta ? "#f1c40f" : "#dc3545";
-            div.setAttribute('style', `border-left: 5px solid ${colorBorde}; background: #252525; padding: 15px; margin: 10px 0; border-radius: 8px;`);
+            item.setAttribute('style', `border-left: 5px solid ${colorBorde}; background: #252525; padding: 15px; margin-bottom: 15px; border-radius: 8px; text-align: left;`);
             
-            div.innerHTML = `
+            item.innerHTML = `
                 <p><strong>${idx + 1}. ${r.pregunta}</strong></p>
-                <p style="color: ${r.esCorrecta ? '#2ecc71' : '#ff4d4d'}">Tu respuesta: ${r.seleccionada.toUpperCase()}</p>
-                ${!r.esCorrecta ? `<p style="color: #2ecc71">Correcta: ${r.correcta.toUpperCase()}</p>` : ''}
-                <div style="background: #1a1a1a; padding: 10px; margin-top: 10px; font-size: 0.9em; border-radius: 4px; color: #bbb;">💡 ${r.feedback}</div>
+                <p style="color: ${r.esCorrecta ? '#28a745' : '#dc3545'}; margin: 5px 0;">Tu respuesta: ${r.seleccionada.toUpperCase()} - ${r.opciones[r.seleccionada]}</p>
+                ${!r.esCorrecta ? `<p style="color: #28a745; margin: 5px 0;">Correcta: ${r.correcta.toUpperCase()} - ${r.opciones[r.correcta]}</p>` : ''}
+                <div style="background: #111; padding: 10px; border-radius: 4px; margin-top: 10px; font-style: italic; font-size: 0.9em; color: #bbb;">
+                    💡 ${r.feedback}
+                </div>
             `;
-            informeContenedor.appendChild(div);
+            informeContenedor.appendChild(item);
         });
     }
 
     document.getElementById('contenedor-boton-volver').innerHTML = `<button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>`;
-}
-
-// 3. ESTADÍSTICAS (Título de test como enlace)
-document.getElementById('btnEstadisticas').onclick = async () => {
-    const data = await supabaseFetch("tests?select=*&visible=eq.true");
-    const container = document.getElementById('pantalla-estadisticas');
-    container.classList.remove('hidden');
-    document.getElementById('pantalla-inicio').classList.add('hidden');
-    
-    container.innerHTML = `<h2 style="text-align:center">MIS ESTADÍSTICAS</h2>`;
-    data.forEach(t => {
-        const div = document.createElement('div');
-        div.className = "bloque-est-container";
-        div.innerHTML = `
-            <div class="info-bloque">
-                <a href="#" style="color: #9c4dcc; text-decoration: none;" onclick="event.preventDefault(); seleccionarTest('${t.id}')">📂 ${t.nombre}</a>
-            </div>
-            <div class="barra-fondo"><div class="barra-progreso" style="width: 0%"></div></div>
-        `;
-        container.appendChild(div);
-    });
-    container.innerHTML += `<button class="btn-volver" onclick="location.reload()">VOLVER</button>`;
-};
-
-function seleccionarTest(id) {
-    const radio = document.querySelector(`input[value="${id}"]`);
-    if (radio) {
-        radio.checked = true;
-        document.getElementById('pantalla-estadisticas').classList.add('hidden');
-        document.getElementById('pantalla-inicio').classList.remove('hidden');
-        radio.scrollIntoView({ behavior: 'smooth' });
-    }
 }
 
 document.getElementById('btnArriesgando').onclick = function() {
