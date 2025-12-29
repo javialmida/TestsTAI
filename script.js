@@ -8,30 +8,26 @@ let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
 let modoEstudio = true;
 let esDudada = false;
 
-// Función de conexión robusta
+// Conexión limpia
 async function supabaseFetch(endpoint) {
-    const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-    const res = await fetch(url, {
-        method: 'GET',
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
         headers: {
             "apikey": SUPABASE_KEY,
             "Authorization": `Bearer ${SUPABASE_KEY}`,
             "Content-Type": "application/json"
         }
     });
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Error en DB: ${res.status} - ${errText}`);
-    }
+    if (!res.ok) throw new Error("Error en la red");
     return await res.json();
 }
 
-// 2. CARGA DEL MENÚ (Mantiene tus listas B1, B2, B3, B4...)
+// 2. CARGA DE MENÚ (Sincronizado con tus IDs de index.html)
 async function cargarMenuDinamico() {
     try {
         const data = await supabaseFetch("tests?select=id,nombre,bloque_id&visible=eq.true&order=id.asc");
         
-        ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
+        const contenedores = ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'];
+        contenedores.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = "";
         });
@@ -45,28 +41,23 @@ async function cargarMenuDinamico() {
             const contenedor = document.getElementById(contenedorId);
             if (contenedor) contenedor.appendChild(label);
         });
-    } catch (e) { 
-        console.error("Fallo al cargar tests:", e); 
-    }
+    } catch (e) { console.error("Error cargando menú:", e); }
 }
 
-// 3. COMENZAR TEST (Ajustado para evitar el error de carga)
+// 3. COMENZAR TEST
 document.getElementById('btnComenzar').onclick = async () => {
-    const sel = document.querySelector('input[name="test-select"]:checked');
-    if (!sel) return alert("Selecciona un test 🚀");
+    const seleccionado = document.querySelector('input[name="test-select"]:checked');
+    if (!seleccionado) return alert("Selecciona un test 🚀");
     
     const btn = document.getElementById('btnComenzar');
-    const textoOriginal = btn.textContent;
     btn.textContent = "CARGANDO...";
     
     try {
-        // Usamos la sintaxis más compatible para el filtro eq
-        const testId = sel.value;
-        const data = await supabaseFetch(`preguntas?test_id=eq.${testId}&select=*&order=numero_orden.asc`);
+        const data = await supabaseFetch(`preguntas?test_id=eq.${seleccionado.value}&order=numero_orden.asc`);
         
         if (!data || data.length === 0) {
-            alert("Este test no tiene preguntas. ¡Revisa la tabla 'preguntas' en Supabase!");
-            btn.textContent = textoOriginal;
+            alert("Test sin preguntas.");
+            btn.textContent = "COMENZAR TEST";
             return;
         }
 
@@ -74,30 +65,32 @@ document.getElementById('btnComenzar').onclick = async () => {
             enunciado: p.enunciado,
             opciones: { a: p.opcion_a, b: p.opcion_b, c: p.opcion_c, d: p.opcion_d },
             correcta: (p.correcta || 'a').toLowerCase().trim(),
-            feedback: p.feedback || "Sin explicación adicional."
+            feedback: p.feedback || "Sin explicación."
         }));
         
-        const modoInput = document.querySelector('input[name="modo"]:checked');
-        modoEstudio = modoInput ? modoInput.value === 'estudio' : true;
-
+        modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
+        
+        // Cambio de pantallas
         document.getElementById('pantalla-inicio').classList.add('hidden');
+        document.querySelector('.footer-controls').classList.add('hidden');
         document.getElementById('pantalla-test').classList.remove('hidden');
 
         preguntaActualIndex = 0;
         puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
         mostrarPregunta();
     } catch (e) {
-        console.error("Error crítico:", e);
-        alert("Error al cargar preguntas. Mira la consola (F12) para más detalles.");
+        alert("Error al cargar el test");
     } finally {
-        btn.textContent = textoOriginal;
+        btn.textContent = "COMENZAR TEST";
     }
 };
 
-// 4. MOSTRAR PREGUNTA (Tus IDs e interfaz original)
+// 4. MOSTRAR PREGUNTA
 function mostrarPregunta() {
     esDudada = false;
-    document.getElementById('btnArriesgando').classList.remove('active');
+    const btnArriesgando = document.getElementById('btnArriesgando');
+    if(btnArriesgando) btnArriesgando.classList.remove('active');
+    
     document.getElementById('feedback-area').classList.add('hidden');
     
     const p = preguntasTest[preguntaActualIndex];
@@ -106,51 +99,52 @@ function mostrarPregunta() {
     
     const container = document.getElementById('opciones-container');
     container.innerHTML = "";
-    document.getElementById('btnAccion').disabled = true;
-    document.getElementById('btnAccion').textContent = "CORREGIR";
+    
+    const btnAccion = document.getElementById('btnAccion');
+    btnAccion.disabled = true;
+    btnAccion.textContent = "CORREGIR";
 
     Object.entries(p.opciones).forEach(([letra, texto]) => {
         if (!texto) return;
-        const btn = document.createElement('button');
-        btn.className = 'opcion';
-        btn.dataset.letra = letra;
-        btn.innerHTML = `<span class="letra">${letra.toUpperCase()}</span> ${texto}`;
-        btn.onclick = () => {
+        const btnOpc = document.createElement('button');
+        btnOpc.className = 'opcion';
+        btnOpc.innerHTML = `<span class="letra">${letra.toUpperCase()}</span> ${texto}`;
+        btnOpc.onclick = () => {
             document.querySelectorAll('.opcion').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            document.getElementById('btnAccion').disabled = false;
-            document.getElementById('btnAccion').onclick = () => procesarRespuesta(letra);
+            btnOpc.classList.add('selected');
+            btnAccion.disabled = false;
+            btnAccion.onclick = () => procesarRespuesta(letra);
         };
-        container.appendChild(btn);
+        container.appendChild(btnOpc);
     });
 }
 
-// 5. BOTÓN ARRIESGANDO
-document.getElementById('btnArriesgando').onclick = function() {
-    esDudada = !esDudada;
-    this.classList.toggle('active', esDudada);
-};
-
-// 6. PROCESAR RESPUESTA
+// 5. PROCESAR RESPUESTA
 function procesarRespuesta(seleccionada) {
     const p = preguntasTest[preguntaActualIndex];
     const correcta = p.correcta;
     
     if (esDudada) puntuacion.arriesgadas++;
-    if (seleccionada === correcta) puntuacion.aciertos++;
-    else puntuacion.fallos++;
+    
+    if (seleccionada === correcta) {
+        puntuacion.aciertos++;
+    } else {
+        puntuacion.fallos++;
+    }
+
+    const btnAccion = document.getElementById('btnAccion');
 
     if (modoEstudio) {
         document.querySelectorAll('.opcion').forEach(btn => {
-            const l = btn.dataset.letra; 
-            if (l === correcta) btn.style.background = "#28a745"; 
-            if (l === seleccionada && seleccionada !== correcta) btn.style.background = "#dc3545";
-            btn.disabled = true; 
+            const letraBtn = btn.querySelector('.letra').textContent.toLowerCase();
+            if (letraBtn === correcta) btn.style.background = "#28a745"; 
+            if (letraBtn === seleccionada && seleccionada !== correcta) btn.style.background = "#dc3545";
+            btn.style.pointerEvents = "none"; 
         });
         document.getElementById('feedback-texto').textContent = p.feedback;
         document.getElementById('feedback-area').classList.remove('hidden');
-        document.getElementById('btnAccion').textContent = "SIGUIENTE";
-        document.getElementById('btnAccion').onclick = () => siguiente();
+        btnAccion.textContent = "SIGUIENTE";
+        btnAccion.onclick = () => siguiente();
     } else {
         siguiente();
     }
@@ -165,7 +159,7 @@ function siguiente() {
     }
 }
 
-// 7. FINALIZAR TEST (Tus cápsulas de resultados)
+// 6. FINALIZAR
 function finalizarTest() {
     document.getElementById('pantalla-test').classList.add('hidden');
     document.getElementById('pantalla-resultados').classList.remove('hidden');
@@ -188,5 +182,15 @@ function finalizarTest() {
         <button class="btn-volver" onclick="location.reload()">VOLVER AL INICIO</button>
     `;
 }
+
+// Eventos adicionales
+document.getElementById('btnArriesgando').onclick = function() {
+    esDudada = !esDudada;
+    this.classList.toggle('active', esDudada);
+};
+
+// Si tienes un botón "Salir" en el test, forzamos su función
+const btnSalirTest = document.querySelector('.btn-exit'); 
+if(btnSalirTest) btnSalirTest.onclick = () => location.reload();
 
 window.onload = cargarMenuDinamico;
