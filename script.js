@@ -8,7 +8,7 @@ let puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
 let modoEstudio = true;
 let esDudada = false;
 
-// Función para hablar con Supabase sin librerías externas
+// Función para hablar con Supabase vía REST
 async function supabaseFetch(endpoint) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
         headers: {
@@ -22,12 +22,11 @@ async function supabaseFetch(endpoint) {
     return await res.json();
 }
 
-// 2. CARGA DEL MENÚ (Respeta tus listas B1, B2, B3, B4)
+// 2. CARGA DEL MENÚ (Respeta tus listas B1, B2, B3, B4 y oficiales)
 async function cargarMenuDinamico() {
     try {
         const data = await supabaseFetch("tests?select=id,nombre,bloque_id&visible=eq.true");
         
-        // Limpiamos los contenedores originales de tu index.html
         ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = "";
@@ -38,7 +37,7 @@ async function cargarMenuDinamico() {
             label.className = 'test-item';
             label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombre}</span>`;
             
-            // Si bloque_id es 1 va a lista-B1, etc.
+            // Mapeo por bloque_id
             const contenedorId = t.bloque_id === 5 ? 'lista-oficiales' : `lista-B${t.bloque_id}`;
             const contenedor = document.getElementById(contenedorId);
             if (contenedor) contenedor.appendChild(label);
@@ -46,25 +45,36 @@ async function cargarMenuDinamico() {
     } catch (e) { console.error("Error cargando menú:", e); }
 }
 
-// 3. COMENZAR TEST (Tu lógica original de cambio de pantalla)
+// 3. COMENZAR TEST (Conexión a tabla preguntas corregida)
 document.getElementById('btnComenzar').onclick = async () => {
     const sel = document.querySelector('input[name="test-select"]:checked');
     if (!sel) return alert("Selecciona un test 🚀");
     
     const btn = document.getElementById('btnComenzar');
+    const textoOriginal = btn.textContent;
     btn.textContent = "CARGANDO...";
     
+    const testId = parseInt(sel.value); // Aseguramos que sea número para Postgres
+    
     try {
-        const data = await supabaseFetch(`preguntas?test_id=eq.${sel.value}&order=numero_orden.asc`);
+        const data = await supabaseFetch(`preguntas?test_id=eq.${testId}&order=numero_orden.asc`);
         
+        if (!data || data.length === 0) {
+            alert("Este test no tiene preguntas cargadas todavía.");
+            btn.textContent = textoOriginal;
+            return;
+        }
+
         preguntasTest = data.map(p => ({
             enunciado: p.enunciado,
             opciones: { a: p.opcion_a, b: p.opcion_b, c: p.opcion_c, d: p.opcion_d },
-            correcta: p.correcta,
-            feedback: p.feedback || "Sin explicación disponible."
+            correcta: p.correcta ? p.correcta.toLowerCase().trim() : 'a',
+            feedback: p.feedback || "Sin explicación adicional."
         }));
         
-        modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
+        const modoSeleccionado = document.querySelector('input[name="modo"]:checked');
+        modoEstudio = modoSeleccionado ? modoSeleccionado.value === 'estudio' : true;
+
         document.getElementById('pantalla-inicio').classList.add('hidden');
         document.getElementById('pantalla-test').classList.remove('hidden');
 
@@ -72,13 +82,14 @@ document.getElementById('btnComenzar').onclick = async () => {
         puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
         mostrarPregunta();
     } catch (e) {
-        alert("Error al conectar con Supabase.");
+        console.error(e);
+        alert("Error al obtener las preguntas.");
     } finally {
-        btn.textContent = "COMENZAR TEST";
+        btn.textContent = textoOriginal;
     }
 };
 
-// 4. MOSTRAR PREGUNTA (Tus IDs originales: pregunta-texto, opciones-container...)
+// 4. MOSTRAR PREGUNTA (Toda tu lógica visual intacta)
 function mostrarPregunta() {
     esDudada = false;
     document.getElementById('btnArriesgando').classList.remove('active');
@@ -115,7 +126,7 @@ document.getElementById('btnArriesgando').onclick = function() {
     this.classList.toggle('active', esDudada);
 };
 
-// 6. PROCESAR RESPUESTA (Colores y lógica de puntuación original)
+// 6. PROCESAR RESPUESTA
 function procesarRespuesta(seleccionada) {
     const p = preguntasTest[preguntaActualIndex];
     const correcta = p.correcta.toLowerCase().trim();
@@ -149,7 +160,7 @@ function siguiente() {
     }
 }
 
-// 7. FINALIZAR TEST (Vuelve el resumen "Guapo" con las stats-grid)
+// 7. FINALIZAR TEST (Cápsulas de resultados originales)
 function finalizarTest() {
     document.getElementById('pantalla-test').classList.add('hidden');
     document.getElementById('pantalla-resultados').classList.remove('hidden');
@@ -174,5 +185,4 @@ function finalizarTest() {
     `;
 }
 
-// Inicio
 window.onload = cargarMenuDinamico;
