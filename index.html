@@ -20,43 +20,27 @@
             <section class="section-box">
                 <h2>TESTS POR TEMA</h2>
                 <div class="acordeon" id="acordeon-temas">
-                    <details class="bloque" id="bloque-1">
-                        <summary>BLOQUE 1 - Organización del Estado</summary>
-                        <div class="test-list" id="lista-B1"><p class="loading-text">Buscando tests...</p></div>
-                    </details>
-                    <details class="bloque" id="bloque-2">
-                        <summary>BLOQUE 2 - Tecnología Básica</summary>
-                        <div class="test-list" id="lista-B2"></div>
-                    </details>
-                    <details class="bloque" id="bloque-3">
-                        <summary>BLOQUE 3 - Desarrollo de Sistemas</summary>
-                        <div class="test-list" id="lista-B3"></div>
-                    </details>
-                    <details class="bloque" id="bloque-4">
-                        <summary>BLOQUE 4 - Redes y Seguridad</summary>
-                        <div class="test-list" id="lista-B4"></div>
-                    </details>
-                </div>
-            </section>
-
-            <section class="section-box">
-                <h2>OFICIALES Y SIMULACROS</h2>
-                <div class="exam-grid" id="lista-oficiales">
-                    <p class="loading-text">No hay exámenes disponibles</p>
+                    <p class="loading-text">Cargando bloques...</p>
                 </div>
             </section>
         </main>
 
         <section id="pantalla-test" class="hidden">
             <div class="test-header">
-                <span id="contador-preguntas">Pregunta 1/X</span>
+                <div class="info-test">
+                    <span id="nombre-test-activo">Test...</span>
+                    <span id="separador-test"> | </span>
+                    <span id="contador-preguntas">Pregunta 1/X</span>
+                </div>
                 <button id="btnSalir" class="btn-danger">SALIR</button>
             </div>
-            <div class="pregunta-box">
-                <p id="enunciado">Cargando pregunta...</p>
+            
+            <div id="pregunta-container">
+                <h3 id="pregunta-texto">Cargando pregunta...</h3>
+                <div id="opciones-container" class="opciones-lista"></div>
             </div>
-            <div id="opciones-lista"></div>
-            <div class="controls-container" style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+
+            <div class="duda-container">
                 <button id="btnArriesgando" class="btn-warning">¿DUDAS? (ARRIESGANDO)</button>
             </div>
             <div class="test-footer">
@@ -82,13 +66,12 @@
         </footer>
 
         <div id="pantalla-resultados" class="hidden">
-            <h2 style="text-align: center; color: #7b2cbf; margin-bottom: 20px;">RESUMEN DEL TEST</h2>
+            <h2 style="text-align: center; color: #7b2cbf; margin-bottom: 20px;">RESULTADO</h2>
             <div id="contenedor-stats"></div>
             <div id="contenedor-informe" class="informe-estilo"></div>
             <div id="contenedor-boton-volver" class="container-volver"></div>
         </div>
         
-        <div id="pantalla-estadisticas" class="hidden container"></div>
     </div>
     <script src="script.js"></script>
 </body>
