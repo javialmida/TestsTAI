@@ -16,117 +16,221 @@ async function supabaseFetch(endpoint) {
 }
 
 async function cargarMenuDinamico() {
+    // Listener para acordeón exclusivo
+    document.addEventListener("click", function(e) {
+        if (e.target.tagName === "SUMMARY" && e.target.parentElement.classList.contains("bloque")) {
+            const details = document.querySelectorAll("details.bloque");
+            details.forEach(d => {
+                if (d !== e.target.parentElement) {
+                    d.removeAttribute("open");
+                }
+            });
+        }
+    });
+
     try {
         const data = await supabaseFetch("tests?select=*&visible=eq.true&order=id.asc");
-        ['lista-B1', 'lista-B2', 'lista-B3', 'lista-B4', 'lista-oficiales'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = "";
+        
+        // Agrupar por bloques
+        const bloques = {};
+        data.forEach(test => {
+            if (!bloques[test.bloque]) bloques[test.bloque] = [];
+            bloques[test.bloque].push(test);
         });
-        data.forEach(t => {
-            const label = document.createElement('label');
-            label.className = 'test-item';
-            label.innerHTML = `<input type="radio" name="test-select" value="${t.id}"> <span>${t.nombre}</span>`;
-            const cId = t.bloque_id === 5 ? 'lista-oficiales' : `lista-B${t.bloque_id}`;
-            if (document.getElementById(cId)) document.getElementById(cId).appendChild(label);
-        });
-    } catch (e) { console.error(e); }
+
+        const acordeon = document.getElementById('acordeon-temas');
+        acordeon.innerHTML = ""; // Limpiar loading
+
+        for (const [bloqueId, tests] of Object.entries(bloques)) {
+            // Creamos el details
+            const details = document.createElement('details');
+            details.className = 'bloque';
+            
+            // Nombre del bloque (Asumimos formato 'B1', 'B2' etc, mapeamos a texto si quieres, por ahora genérico)
+            // Si en la BD tienes un nombre largo para el bloque, úsalo aquí. Usaremos "BLOQUE X" por defecto.
+            const summary = document.createElement('summary');
+            summary.innerText = `BLOQUE ${bloqueId}`;
+            
+            const divList = document.createElement('div');
+            divList.className = 'test-list';
+
+            tests.forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'test-item';
+                item.innerHTML = `
+                    <input type="radio" name="test-select" value="${t.id}" id="t-${t.id}">
+                    <label for="t-${t.id}">${t.titulo}</label>
+                `;
+                divList.appendChild(item);
+            });
+
+            details.appendChild(summary);
+            details.appendChild(divList);
+            acordeon.appendChild(details);
+        }
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById('acordeon-temas').innerHTML = "<p>Error cargando tests.</p>";
+    }
 }
+
+// Inicializar menú
+cargarMenuDinamico();
+
+// Lógica Botones y Test
+document.getElementById('btnEstadisticas').onclick = () => {
+    alert("Próximamente: Estadísticas detalladas");
+};
+
+document.getElementById('btnSalir').onclick = () => {
+    if(confirm("¿Seguro que quieres salir? Perderás el progreso actual.")) {
+        location.reload();
+    }
+};
 
 document.getElementById('btnComenzar').onclick = async () => {
     const sel = document.querySelector('input[name="test-select"]:checked');
     if (!sel) return alert("Selecciona un test 🚀");
     
-    document.getElementById('btnComenzar').textContent = "CARGANDO...";
+    // Capturar nombre del test para la cabecera
+    const nombreTest = sel.nextElementSibling.innerText;
+    document.getElementById('nombre-test-activo').innerText = nombreTest;
+
+    const testId = sel.value;
+    const modo = document.querySelector('input[name="modo"]:checked').value;
+    modoEstudio = (modo === 'estudio');
+
+    // UI
+    document.querySelector('footer').classList.add('hidden');
+    document.getElementById('pantalla-inicio').classList.add('hidden');
+    document.querySelector('header').classList.add('hidden'); // Ocultar header principal si quieres, o dejarlo
+    document.getElementById('pantalla-test').classList.remove('hidden');
+
+    // Cargar preguntas
+    const preguntas = await supabaseFetch(`preguntas?test_id=eq.${testId}`);
+    // Mezclar preguntas (Fisher-Yates)
+    preguntasTest = preguntas.sort(() => Math.random() - 0.5);
     
-    try {
-        const data = await supabaseFetch(`preguntas?test_id=eq.${sel.value}&order=numero_orden.asc`);
-        preguntasTest = data.map(p => ({
-            enunciado: p.enunciado,
-            opciones: { a: p.opcion_a, b: p.opcion_b, c: p.opcion_c, d: p.opcion_d },
-            correcta: (p.correcta || 'a').toLowerCase().trim(),
-            feedback: p.feedback || "Sin explicación adicional."
-        }));
-        
-        modoEstudio = document.querySelector('input[name="modo"]:checked').value === 'estudio';
-        respuestasUsuario = [];
-        preguntaActualIndex = 0;
-        puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
-
-        document.getElementById('pantalla-inicio').classList.add('hidden');
-        document.querySelector('.footer-controls').classList.add('hidden');
-        document.getElementById('pantalla-test').classList.remove('hidden');
-
-        mostrarPregunta();
-    } catch (e) { alert("Error al cargar"); }
-    document.getElementById('btnComenzar').textContent = "COMENZAR TEST";
+    preguntaActualIndex = 0;
+    puntuacion = { aciertos: 0, fallos: 0, arriesgadas: 0 };
+    respuestasUsuario = [];
+    
+    mostrarPregunta();
 };
 
 function mostrarPregunta() {
-    esDudada = false;
-    document.getElementById('btnArriesgando').classList.remove('active');
-    document.getElementById('feedback-area').classList.add('hidden');
-    
     const p = preguntasTest[preguntaActualIndex];
-    document.getElementById('contador-preguntas').textContent = `Pregunta ${preguntaActualIndex + 1}/${preguntasTest.length}`;
-    document.getElementById('enunciado').textContent = p.enunciado;
+    document.getElementById('contador-preguntas').innerText = `Pregunta ${preguntaActualIndex + 1}/${preguntasTest.length}`;
+    document.getElementById('pregunta-texto').innerText = p.pregunta;
     
-    const container = document.getElementById('opciones-lista');
+    // Opciones
+    const opts = ['a', 'b', 'c', 'd'];
+    const container = document.getElementById('opciones-container');
     container.innerHTML = "";
+    
+    // Resetear estados
+    esDudada = false;
+    document.getElementById('feedback-area').classList.add('hidden');
     document.getElementById('btnAccion').disabled = true;
-    document.getElementById('btnAccion').textContent = "CORREGIR";
+    document.getElementById('btnAccion').innerText = "CORREGIR";
+    document.getElementById('btnArriesgando').classList.remove('hidden');
 
-    Object.entries(p.opciones).forEach(([letra, texto]) => {
-        if (!texto) return;
-        const btn = document.createElement('button');
-        btn.className = 'opcion';
-        btn.innerHTML = `<span class="letra">${letra.toUpperCase()}</span> ${texto}`;
-        btn.onclick = () => {
-            document.querySelectorAll('.opcion').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            document.getElementById('btnAccion').disabled = false;
-            document.getElementById('btnAccion').onclick = () => procesarRespuesta(letra);
-        };
-        container.appendChild(btn);
+    opts.forEach(letra => {
+        if (!p[`opcion_${letra}`]) return; // por si acaso alguna es null
+        
+        const div = document.createElement('div');
+        div.className = 'opcion';
+        div.dataset.letra = letra;
+        div.innerText = `${letra.toUpperCase()}) ${p[`opcion_${letra}`]}`;
+        
+        div.onclick = () => seleccionarOpcion(div);
+        container.appendChild(div);
     });
 }
 
-function procesarRespuesta(seleccionada) {
+function seleccionarOpcion(div) {
+    if (document.getElementById('btnAccion').innerText === "SIGUIENTE") return; // Ya corregido
+
+    document.querySelectorAll('.opcion').forEach(o => o.classList.remove('selected'));
+    div.classList.add('selected');
+    document.getElementById('btnAccion').disabled = false;
+}
+
+document.getElementById('btnArriesgando').onclick = () => {
+    esDudada = !esDudada;
+    const btn = document.getElementById('btnArriesgando');
+    if (esDudada) {
+        btn.style.border = "2px solid white";
+        btn.innerText = "DUDADA (MARCADA)";
+    } else {
+        btn.style.border = "none";
+        btn.innerText = "¿DUDAS? (ARRIESGANDO)";
+    }
+};
+
+document.getElementById('btnAccion').onclick = () => {
+    const btn = document.getElementById('btnAccion');
+    if (btn.innerText === "CORREGIR") {
+        corregirPregunta();
+    } else {
+        siguientePregunta();
+    }
+};
+
+function corregirPregunta() {
     const p = preguntasTest[preguntaActualIndex];
-    const esCorrecta = seleccionada === p.correcta;
-    
+    const seleccionadaDiv = document.querySelector('.opcion.selected');
+    const letraSeleccionada = seleccionadaDiv.dataset.letra;
+    const esCorrecta = (letraSeleccionada === p.correcta);
+
+    // Guardar respuesta
     respuestasUsuario.push({
-        pregunta: p.enunciado,
-        seleccionada: seleccionada,
+        pregunta: p.pregunta,
+        opciones: {
+            a: p.opcion_a, b: p.opcion_b, c: p.opcion_c, d: p.opcion_d
+        },
+        seleccionada: letraSeleccionada,
         correcta: p.correcta,
         esCorrecta: esCorrecta,
-        feedback: p.feedback,
         dudada: esDudada,
-        opciones: p.opciones
+        feedback: p.explicacion
     });
 
-    if (esDudada) puntuacion.arriesgadas++;
-    if (esCorrecta) puntuacion.aciertos++; else puntuacion.fallos++;
-
-    if (modoEstudio) {
-        document.querySelectorAll('.opcion').forEach(btn => {
-            const l = btn.querySelector('.letra').textContent.toLowerCase();
-            if (l === p.correcta) btn.style.background = "#28a745"; 
-            if (l === seleccionada && !esCorrecta) btn.style.background = "#dc3545";
-            btn.style.pointerEvents = "none";
-        });
-        document.getElementById('feedback-texto').textContent = p.feedback;
-        document.getElementById('feedback-area').classList.remove('hidden');
-        document.getElementById('btnAccion').textContent = "SIGUIENTE";
-        document.getElementById('btnAccion').onclick = irASiguiente;
+    // Puntuación
+    if (esCorrecta) {
+        puntuacion.aciertos++;
+        if (esDudada) puntuacion.arriesgadas++;
     } else {
-        irASiguiente();
+        puntuacion.fallos++;
     }
+
+    // Visual
+    const opciones = document.querySelectorAll('.opcion');
+    opciones.forEach(o => {
+        o.style.pointerEvents = 'none'; // bloquear clicks
+        if (o.dataset.letra === p.correcta) o.classList.add('correct');
+        if (o.dataset.letra === letraSeleccionada && !esCorrecta) o.classList.add('incorrect');
+    });
+
+    // Feedback visual
+    if (modoEstudio) {
+        const fbArea = document.getElementById('feedback-area');
+        document.getElementById('feedback-texto').innerText = p.explicacion || "Sin explicación disponible.";
+        fbArea.classList.remove('hidden');
+    }
+
+    document.getElementById('btnArriesgando').classList.add('hidden');
+    document.getElementById('btnAccion').innerText = "SIGUIENTE";
 }
 
-function irASiguiente() {
+function siguientePregunta() {
     preguntaActualIndex++;
-    if (preguntaActualIndex < preguntasTest.length) mostrarPregunta();
-    else finalizarTest();
+    if (preguntaActualIndex < preguntasTest.length) {
+        mostrarPregunta();
+    } else {
+        finalizarTest();
+    }
 }
 
 function finalizarTest() {
@@ -134,7 +238,8 @@ function finalizarTest() {
     document.getElementById('pantalla-resultados').classList.remove('hidden');
     
     const total = preguntasTest.length;
-    const nota = ((puntuacion.aciertos - (puntuacion.fallos * 0.33)) * 10 / total).toFixed(2);
+    // Nota calculada como (Aciertos / Total) * 10
+    const nota = total > 0 ? ((puntuacion.aciertos / total) * 10).toFixed(2) : 0;
 
     // INYECCIÓN DE CÁPSULAS HORIZONTALES
     document.getElementById('contenedor-stats').innerHTML = `
@@ -145,12 +250,15 @@ function finalizarTest() {
         </div>
         <div class="caja-brillo-celeste">
             <div class="porcentaje-celeste">${nota}</div>
-            <p style="margin:0; font-weight:bold;">NOTA FINAL</p>
+            <p class="label-nota-final">NOTA FINAL</p>
         </div>
     `;
 
     const informeContenedor = document.getElementById('contenedor-informe');
     informeContenedor.innerHTML = "";
+    
+    // Filtrar fallos O dudas (incluso si la duda fue correcta, a veces el usuario quiere repasarla, 
+    // pero tu instrucción pedía "revisión de preguntas falladas y o dudadas", así que incluyo ambas).
     const fallosODudas = respuestasUsuario.filter(r => !r.esCorrecta || r.dudada);
     
     if (fallosODudas.length > 0) {
@@ -158,24 +266,43 @@ function finalizarTest() {
         fallosODudas.forEach((r, idx) => {
             const item = document.createElement('div');
             item.className = 'revision-item';
-            const colorBorde = r.esCorrecta ? "#f1c40f" : "#dc3545";
+            
+            // Borde amarillo si fue duda (acertada o no), o rojo si fue fallo puro.
+            // Ajuste: Si falló es rojo. Si acertó pero dudó es amarillo.
+            let colorBorde = "#dc3545"; 
+            if (r.esCorrecta && r.dudada) colorBorde = "#f1c40f";
+
             item.style.borderLeft = `5px solid ${colorBorde}`;
+            
+            // Textos completos
+            const textoSeleccionado = r.opciones[r.seleccionada] || "Sin respuesta";
+            const textoCorrecto = r.opciones[r.correcta] || "Error data";
+
             item.innerHTML = `
-                <p><strong>${idx + 1}. ${r.pregunta}</strong></p>
-                <p style="color: ${r.esCorrecta ? '#28a745' : '#dc3545'};">Tu respuesta: ${r.seleccionada.toUpperCase()}</p>
-                ${!r.esCorrecta ? `<p style="color: #28a745;">Correcta: ${r.correcta.toUpperCase()}</p>` : ''}
-                <div style="font-size: 0.9em; color: #bbb; margin-top: 10px;">💡 ${r.feedback}</div>
+                <p><strong>${r.pregunta}</strong></p>
+                
+                <p style="color: ${r.esCorrecta ? '#28a745' : '#dc3545'};">
+                    Tu respuesta: <strong>${textoSeleccionado}</strong>
+                </p>
+                
+                ${!r.esCorrecta ? `<p style="color: #28a745;">Correcta: <strong>${textoCorrecto}</strong></p>` : ''}
+                
+                <div style="
+                    margin-top: 15px; 
+                    padding: 10px; 
+                    background: #333; 
+                    border-radius: 6px; 
+                    border-left: 3px solid #9c4dcc;
+                    font-size: 0.95em; 
+                    color: #e0e0e0;">
+                    💡 ${r.feedback || "Sin explicación"}
+                </div>
             `;
             informeContenedor.appendChild(item);
         });
+    } else {
+        informeContenedor.innerHTML = `<p style="text-align:center; color: #28a745;">¡Test perfecto! No hay nada que revisar.</p>`;
     }
 
     document.getElementById('contenedor-boton-volver').innerHTML = `<button class="btn-main" style="display:block; margin: 20px auto;" onclick="location.reload()">VOLVER AL INICIO</button>`;
 }
-
-document.getElementById('btnArriesgando').onclick = function() {
-    esDudada = !esDudada;
-    this.classList.toggle('active', esDudada);
-};
-document.getElementById('btnSalir').onclick = () => location.reload();
-window.onload = cargarMenuDinamico;
