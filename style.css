@@ -136,7 +136,31 @@ header {
 #stat-acierto-global { color: var(--green); }
 #stat-racha { color: #d29922; }
 
-.stats-container h3 { text-align: center; margin: 40px auto 20px auto; padding: 10px 30px; display: table; border: 1px solid var(--accent); border-radius: 50px; background: rgba(137, 87, 229, 0.05); color: var(--accent); font-size: 1.1em; letter-spacing: 2px; text-transform: uppercase; }
+.stats-container h3 { 
+    text-align: left; /* Alineación natural a la izquierda */
+    margin: 40px 0 15px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #30363d; /* Línea fina de división, estilo GitHub */
+    color: var(--text); /* Color de texto normal, no acento */
+    font-size: 1.2em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* --- ESPACIADO BOTÓN VOLVER --- */
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px; /* Espacio extra para que no pegue con las tarjetas */
+}
+
+/* Si el botón Volver está dentro de stats-header, este margen inferior 
+   asegura que las tarjetas de Respondidas respiren */
+.stats-summary-grid {
+    margin-top: 10px; /* Refuerzo de separación superior */
+}
 
 .bloque-stat-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.95em; font-weight: 700; margin-bottom: 8px; padding: 0 5px; }
 .bloque-stat-info span:last-child { background: rgba(48, 54, 61, 0.5); border: 1px solid #30363d; padding: 2px 10px; border-radius: 12px; font-family: 'Courier New', Courier, monospace; color: var(--text); }
