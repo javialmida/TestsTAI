@@ -33,23 +33,27 @@ const app = {
                 });
             });
 
-            // --- CAMBIO: Traemos también los nombres de los bloques ---
-            const [testsRes, bloquesRes] = await Promise.all([
+            // --- CAMBIO: Traemos tests, bloques Y AHORA TAMBIÉN INTENTOS ---
+            const [testsRes, bloquesRes, intentosRes] = await Promise.all([
                 sb.from('tests').select(`id, nombre, tipo, identificador, visible, temas (nombre, bloque_id)`).eq('visible', true),
-                sb.from('bloques').select('id, nombre')
+                sb.from('bloques').select('id, nombre'),
+                sb.from('intentos').select('test_id') // <--- NUEVO: Pedimos los IDs de intentos
             ]);
             
             if (testsRes.error) throw testsRes.error;
             const tests = testsRes.data;
             const nombresBloques = bloquesRes.data || [];
+            
+            // --- NUEVO: Creamos un Set (lista única) con los IDs de tests que ya se han hecho ---
+            const testsHechos = new Set((intentosRes.data || []).map(i => i.test_id));
 
             // 1. OFICIALES
             const oficiales = tests.filter(t => t.tipo === 'examen_simulacro');
             document.getElementById('list-oficiales').innerHTML = oficiales.map(t => `
                 <div class="test-row oficial-row" onclick="app.start(${t.id})">
                     <span class="badge-blue">${t.identificador || 'OFICIAL'}</span>
-                    <strong>${t.nombre}</strong>
-                </div>`).join('');
+                    <strong>${t.nombre}${testsHechos.has(t.id) ? ' ✅' : ''}</strong> 
+                </div>`).join(''); // ^^^ AÑADIDO EL TERNARIO DEL TICK
 
             // 2. AGRUPAR POR BLOQUE
             const temasTests = tests.filter(t => t.tipo === 'test_por_tema');
@@ -80,7 +84,7 @@ const app = {
                         ${bloques[bId].map(t => `
                             <div class="test-row" onclick="app.start(${t.id})">
                                 <span class="tag-id">${t.identificador || 'TEST'}</span> 
-                                <strong>${t.nombre}</strong>
+                                <strong>${t.nombre}${testsHechos.has(t.id) ? ' ✅' : ''}</strong>
                             </div>
                         `).join('')}
                     </div>
@@ -116,7 +120,7 @@ const app = {
             } else if (tipo === 'semanal') {
                 const unaSemanaAtras = new Date();
                 unaSemanaAtras.setDate(unaSemanaAtras.getDate() - 7);
-                query = query.gte('ultimo_fallo', unaSemanaAtras.toISOString()).order('ultimo_fallo', { ascending: false });
+                query = query.gte('ultimo_fallo', unaSemanaAtras.toISOString()).order('ultimo_fallo', { ascending: false }).limit(50);
                 state.currentTestName = "📅 REPASO SEMANAL";
             }
             const { data: listaErrores, error: errErr } = await query;
@@ -189,7 +193,21 @@ const app = {
         document.getElementById('btn-arriesgando').classList.remove('active');
         document.getElementById('counter').innerText = `Pregunta ${state.cur + 1}/${state.q.length}`;
         document.getElementById('counter').classList.remove('hidden');
-        document.getElementById('q-enunciado').innerHTML = `<div style="font-size: 0.6em; color: #888; margin-bottom: 5px; text-transform: uppercase;">${state.currentTestName}</div>${item.enunciado}`;
+        
+        // CORREGIDO: Se usa 'item', se incluye el número y se mantiene el título del test
+        document.getElementById('q-enunciado').innerHTML = `<div style="font-size: 0.6em; color: #888; margin-bottom: 5px; text-transform: uppercase;">${state.currentTestName}</div>${state.cur + 1}. ${item.enunciado}`;
+
+        // --- BLOQUE NUEVO (CORREGIDO) ---
+        const imgEl = document.getElementById('question-img');
+        if (item.imagen_url) { // Cambiado 'q' por 'item'
+            imgEl.src = item.imagen_url;
+            imgEl.classList.remove('hidden');
+        } else {
+            imgEl.classList.add('hidden');
+            imgEl.src = ''; 
+        }
+        // --- FIN BLOQUE ---
+        
         document.getElementById('q-feedback').classList.add('hidden');
         const btnAccion = document.getElementById('btn-accion');
         btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
