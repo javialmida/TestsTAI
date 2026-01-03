@@ -33,7 +33,7 @@ const app = {
                 });
             });
 
-            // Traemos tests y bloques
+            // --- CAMBIO: Traemos también los nombres de los bloques ---
             const [testsRes, bloquesRes] = await Promise.all([
                 sb.from('tests').select(`id, nombre, tipo, identificador, visible, temas (nombre, bloque_id)`).eq('visible', true),
                 sb.from('bloques').select('id, nombre')
@@ -65,6 +65,7 @@ const app = {
             listTemas.innerHTML = ""; 
 
             Object.keys(bloques).sort().forEach(bId => {
+                // Buscamos el nombre real del bloque usando el ID
                 const bloqueEncontrado = nombresBloques.find(b => b.id == bId);
                 const nombreMostrar = bloqueEncontrado ? bloqueEncontrado.nombre : `BLOQUE ${bId}`;
 
@@ -98,36 +99,6 @@ const app = {
                         bloque.removeAttribute('open');
                     }
                 });
-            }
-        });
-
-        // --- NUEVO: EVENTOS DE TECLADO (A, B, C, D, ESPACIO) ---
-        document.addEventListener('keydown', (e) => {
-            // Solo actuar si estamos viendo un test (view-test no tiene la clase hidden)
-            if (document.getElementById('view-test').classList.contains('hidden')) return;
-
-            const key = e.key.toLowerCase();
-
-            // Selección de opción (A, B, C, D)
-            if (['a', 'b', 'c', 'd'].includes(key)) {
-                // Buscamos el botón que empieza por esa letra para pasárselo a la función original
-                const buttons = document.querySelectorAll('.option-btn');
-                buttons.forEach(btn => {
-                    // Comprobamos si el texto del botón empieza por "a)", "b)", etc.
-                    if (btn.innerText.toLowerCase().startsWith(key + ')')) {
-                        app.handleSelect(key, btn);
-                    }
-                });
-            }
-
-            // Acción principal (Barra Espaciadora) -> CORREGIR / SIGUIENTE
-            if (key === ' ') {
-                e.preventDefault(); // Evitamos que la página haga scroll al pulsar espacio
-                const btnAccion = document.getElementById('btn-accion');
-                // Solo disparamos la acción si el botón está habilitado (es decir, si ya se ha seleccionado respuesta o es modo examen)
-                if (!btnAccion.disabled) {
-                    app.manejarAccion();
-                }
             }
         });
     }, //LLAVE DE CIERRE DE FUNCIÓN INIT
