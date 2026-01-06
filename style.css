@@ -48,7 +48,7 @@ header {
 
 /* --- FILAS Y BOTONES --- */
 .test-row { 
-    background: var(--panel); padding: 15px; margin: 10px 0; 
+    background: var(--panel); padding: 15px; margin: 0; 
     border: 1px solid #30363d; border-radius: 6px; cursor: pointer; 
     display: flex; align-items: center; gap: 10px; transition: 0.2s;
 }
@@ -236,4 +236,5 @@ header {
     border-radius: 8px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     object-fit: contain;
+
 }
