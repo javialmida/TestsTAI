@@ -12,7 +12,8 @@ let state = {
     status: 'waiting', 
     arriesgando: false,
     currentTestId: null, 
-    currentTestName: "" 
+    currentTestName: "",
+    currentIntentoId: null // <--- NUEVO: Para seguir el rastro del intento actual
 };
 
 const app = {
@@ -33,19 +34,19 @@ const app = {
                 });
             });
 
-            // --- CAMBIO: Traemos tests, bloques Y AHORA TAMBIÉN INTENTOS ---
+            // --- CAMBIO: Traemos tests, bloques Y AHORA TAMBIÉN INTENTOS CON EL CAMPO COMPLETADO ---
             const [testsRes, bloquesRes, intentosRes] = await Promise.all([
                 sb.from('tests').select(`id, nombre, tipo, identificador, visible, temas (nombre, bloque_id)`).eq('visible', true),
                 sb.from('bloques').select('id, nombre'),
-                sb.from('intentos').select('test_id') // <--- NUEVO: Pedimos los IDs de intentos
+                sb.from('intentos').select('test_id, completado') // <--- CAMBIO: Pedimos también 'completado'
             ]);
             
             if (testsRes.error) throw testsRes.error;
             const tests = testsRes.data;
             const nombresBloques = bloquesRes.data || [];
             
-            // --- NUEVO: Creamos un Set (lista única) con los IDs de tests que ya se han hecho ---
-            const testsHechos = new Set((intentosRes.data || []).map(i => i.test_id));
+            // --- CAMBIO: Filtramos solo los que tengan completado: true para el check verde ---
+            const testsHechos = new Set((intentosRes.data || []).filter(i => i.completado).map(i => i.test_id));
 
             // 1. OFICIALES
             const oficiales = tests.filter(t => t.tipo === 'examen_simulacro');
@@ -53,7 +54,7 @@ const app = {
                 <div class="test-row oficial-row" onclick="app.start(${t.id})">
                     <span class="badge-blue">${t.identificador || 'OFICIAL'}</span>
                     <strong>${t.nombre}${testsHechos.has(t.id) ? ' ✅' : ''}</strong> 
-                </div>`).join(''); // ^^^ AÑADIDO EL TERNARIO DEL TICK
+                </div>`).join(''); 
 
             // 2. AGRUPAR POR BLOQUE
             const temasTests = tests.filter(t => t.tipo === 'test_por_tema');
@@ -105,7 +106,7 @@ const app = {
                 });
             }
         });
-    }, //LLAVE DE CIERRE DE FUNCIÓN INIT
+    }, 
 
     prepararRepaso: async (tipo) => {
         try {
@@ -138,7 +139,7 @@ const app = {
     },
 
     resetState: () => {
-        state = { q: [], cur: 0, ans: [], mode: 'estudio', status: 'waiting', arriesgando: false, currentTestId: null, currentTestName: "" };
+        state = { q: [], cur: 0, ans: [], mode: 'estudio', status: 'waiting', arriesgando: false, currentTestId: null, currentTestName: "", currentIntentoId: null };
         document.getElementById('q-feedback')?.classList.add('hidden');
         document.getElementById('counter')?.classList.add('hidden');
         document.getElementById('btn-arriesgando')?.classList.remove('active');
@@ -180,11 +181,68 @@ const app = {
             state.currentTestId = testId;
             state.currentTestName = testInfo ? `${testInfo.identificador || ''} ${testInfo.nombre}` : "Test";
             state.mode = document.querySelector('input[name="modo"]:checked').value; 
+            
+            // --- NUEVO: Creamos el intento al inicio ---
+            const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{ 
+                test_id: testId, 
+                aciertos: 0, 
+                fallos: 0, 
+                arriesgadas: 0
+                // completado: false (por defecto en BD)
+            }]).select().single();
+            
+            if (errorIntento) throw errorIntento;
+            state.currentIntentoId = intento.id;
+            // --- FIN NUEVO ---
+
             app.switchView('view-test');
             document.getElementById('btn-salir').classList.remove('hidden');
             app.render();
         } catch (err) { alert(err.message); }
     },
+
+    // --- VERSIÓN DE DEPURACIÓN ---
+    /*actualizarIntento: async () => {
+        if (!state.currentIntentoId) {
+            console.warn("⚠️ No hay ID de intento, no se puede guardar.");
+            return;
+        }
+
+        // 1. Verificamos qué estamos calculando
+        const aciertos = state.ans.filter((a, i) => a && a.letra === state.q[i].correcta.toLowerCase()).length;
+        const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
+        const fallos = state.ans.filter((a, i) => a && a.letra !== state.q[i].correcta.toLowerCase()).length;
+        
+        console.log(`📝 Intentando actualizar ID: ${state.currentIntentoId}`);
+        console.log(`📊 Datos calculados -> Aciertos: ${aciertos}, Fallos: ${fallos}`);
+
+        // 2. Intentamos enviar a Supabase y LEEMOS el error si lo hay
+        const { data, error } = await sb.from('intentos').update({ 
+            aciertos, fallos, arriesgadas 
+        }).eq('id', state.currentIntentoId).select();
+
+        if (error) {
+            console.error("❌ ERROR CRÍTICO AL GUARDAR EN SUPABASE:", error);
+            alert("Error de base de datos: Mira la consola (F12)");
+        } else {
+            console.log("✅ Supabase respondió OK:", data);
+        }
+    },*/
+
+    // --- NUEVA FUNCIÓN AUXILIAR: Actualiza progreso parcial ---
+    actualizarIntento: async () => {
+        if (!state.currentIntentoId) return;
+        const aciertos = state.ans.filter((a, i) => a && a.letra === state.q[i].correcta.toLowerCase()).length;
+        const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
+        // En progreso parcial, solo contamos los fallos reales (respuestas incorrectas), no las preguntas sin contestar
+        const fallos = state.ans.filter((a, i) => a && a.letra !== state.q[i].correcta.toLowerCase()).length;
+        
+        await sb.from('intentos').update({ 
+            aciertos, fallos, arriesgadas 
+        }).eq('id', state.currentIntentoId);
+    },   
+
+
 
     render: () => {
         const item = state.q[state.cur];
@@ -259,6 +317,9 @@ const app = {
         }
         state.status = 'done';
         document.getElementById('btn-accion').innerText = "SIGUIENTE";
+        
+        // --- NUEVO: Actualizamos progreso en BD ---
+        await app.actualizarIntento();
     },
 
     siguiente: () => {
@@ -272,6 +333,8 @@ const app = {
             if (!res || res.letra !== correcta) {
                 app.registrarError(item.id, item.test_id);
             }
+            // --- NUEVO: Actualizamos progreso en BD ---
+            app.actualizarIntento();
         }
 
         if (state.cur < state.q.length - 1) { 
@@ -315,8 +378,15 @@ const app = {
             <div id="revision-list" style="margin-top: 30px;"></div>`;
             
         app.renderRevision();
-        if (state.currentTestId) {
-            await sb.from('intentos').insert([{ test_id: state.currentTestId, aciertos: aciertos, fallos: fallos, arriesgadas: arriesgadas }]);
+        
+        // --- NUEVO: Actualizamos el intento existente y lo marcamos como completado ---
+        if (state.currentIntentoId) {
+            await sb.from('intentos').update({ 
+                aciertos: aciertos, 
+                fallos: fallos, 
+                arriesgadas: arriesgadas,
+                completado: true 
+            }).eq('id', state.currentIntentoId);
         }
     },
 
