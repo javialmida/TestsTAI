@@ -432,114 +432,144 @@ const app = {
     },
 
     renderDashboard: async () => {
-    app.switchView('view-stats');
-    const listBloques = document.getElementById('stats-bloques-list');
-    listBloques.innerHTML = "<p style='text-align:center; opacity:0.5;'>Analizando base de datos...</p>";
-    
-    try {
-        const [intentosRes, testsRes, bloquesRes] = await Promise.all([
-            sb.from('intentos').select('*'),
-            sb.from('tests').select('id, nombre, identificador, temas(nombre, bloque_id)'),
-            sb.from('bloques').select('id, nombre')
-        ]);
-
-        if (intentosRes.error || testsRes.error || bloquesRes.error) throw new Error("Error de red");
+        app.switchView('view-stats');
+        const listBloques = document.getElementById('stats-bloques-list');
+        listBloques.innerHTML = "<p style='text-align:center; opacity:0.5;'>Analizando base de datos...</p>";
         
-        const intentos = intentosRes.data;
-        const todosLosTests = testsRes.data;
-        const todosLosBloques = bloquesRes.data;
-
-        if (!intentos || intentos.length === 0) {
-            listBloques.innerHTML = "<p>No hay datos todavía. ¡Haz un test!</p>"; 
-            return;
-        }
-
-        // Cálculos Globales
-        const tPreg = intentos.reduce((a, c) => a + (c.aciertos + c.fallos), 0);
-        const tOk = intentos.reduce((a, c) => a + c.aciertos, 0);
-        document.getElementById('stat-total-preguntas').innerText = tPreg;
-        document.getElementById('stat-acierto-global').innerText = `${((tOk/tPreg)*100).toFixed(1)}%`;
-        const fechas = [...new Set(intentos.map(i => i.fecha?.split('T')[0]))].length;
-        document.getElementById('stat-racha').innerText = fechas;
-
-        const statsMap = {};
-        intentos.forEach(i => {
-            const testInfo = todosLosTests.find(t => t.id === i.test_id);
-            if (!testInfo) return;
-
-            const bId = testInfo.temas?.bloque_id || 0; 
-            const bloqueNombre = todosLosBloques.find(b => b.id === bId)?.nombre || "OTROS / VARIOS";
+        try {
+            // --- CAMBIO CLAVE 1: Pedimos 'preguntas(count)' dentro de tests ---
+            // Esto le dice a Supabase: "Dime cuántas preguntas tiene este test"
+            const [intentosRes, testsRes, bloquesRes] = await Promise.all([
+                sb.from('intentos').select('*'),
+                sb.from('tests').select('id, nombre, identificador, temas(nombre, bloque_id), preguntas(count)'), 
+                sb.from('bloques').select('id, nombre')
+            ]);
+    
+            if (intentosRes.error || testsRes.error || bloquesRes.error) throw new Error("Error de red");
             
-            if (!statsMap[bId]) {
-                statsMap[bId] = { nombre: bloqueNombre, ok: 0, tot: 0, tests: {} };
+            const intentos = intentosRes.data;
+            const todosLosTests = testsRes.data;
+            const todosLosBloques = bloquesRes.data;
+    
+            if (!intentos || intentos.length === 0) {
+                listBloques.innerHTML = "<p>No hay datos todavía. ¡Haz un test!</p>"; 
+                return;
             }
-
-            statsMap[bId].tot += (i.aciertos + i.fallos);
-            statsMap[bId].ok += i.aciertos;
-
-            if (!statsMap[bId].tests[i.test_id]) {
-                statsMap[bId].tests[i.test_id] = { 
-                    nombre: testInfo.nombre, 
-                    identificador: testInfo.identificador,
-                    ok: 0, tot: 0 
-                };
-            }
-            statsMap[bId].tests[i.test_id].tot += (i.aciertos + i.fallos);
-            statsMap[bId].tests[i.test_id].ok += i.aciertos;
-        });
-
-        // RENDERIZADO CON ORDENACIÓN ESPECIAL
-        listBloques.innerHTML = Object.keys(statsMap)
-            .sort((a, b) => {
-                // Si el nombre contiene "EXÁMENES", lo mandamos al final (peso infinito)
-                const nameA = statsMap[a].nombre.toUpperCase();
-                const nameB = statsMap[b].nombre.toUpperCase();
-                if (nameA.includes("EXÁMENES") || nameA.includes("SIMULACRO")) return 1;
-                if (nameB.includes("EXÁMENES") || nameB.includes("SIMULACRO")) return -1;
-                return a - b; // Por defecto, orden numérico de ID de bloque
-            })
-            .map(bId => {
-                const s = statsMap[bId];
-                const pBloque = ((s.ok / s.tot) * 100).toFixed(0);
-                const colorBloque = pBloque >= 70 ? 'var(--green)' : pBloque >= 40 ? '#d29922' : 'var(--red)';
-
-                return `
-                    <details class="bloque-container">
-                        <summary class="bloque-header">
-                            <div style="flex-grow:1">
-                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; padding-right:15px;">
-                                    <span>📦 ${s.nombre}</span>
-                                    <span style="color:${colorBloque}">${pBloque}%</span>
-                                </div>
-                                <div class="progress-bg" style="margin:0; height:6px;">
-                                    <div class="progress-fill" style="width:${pBloque}%; background:${colorBloque}"></div>
-                                </div>
-                            </div>
-                        </summary>
-                        <div class="bloque-content">
-                            ${Object.keys(s.tests).map(tId => {
-                                const t = s.tests[tId];
-                                const pTest = ((t.ok / t.tot) * 100).toFixed(0);
-                                return `
-                                    <div class="test-row" onclick="app.start(${tId})" style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.02); margin: 4px 0; border-bottom: 1px solid #30363d;">
-                                        <div style="font-size:0.9em;">
-                                            <span class="tag-id">${t.identificador || 'TEST'}</span>
-                                            <strong>${t.nombre}</strong>
-                                        </div>
-                                        <span style="font-weight:bold; color:${pTest >= 70 ? 'var(--green)' : '#888'}">${pTest}%</span>
+    
+            // Preparar mapa de estadísticas
+            const statsMap = {};
+            
+            // Variables para los contadores globales (ahora más realistas)
+            let globalAciertos = 0;
+            let globalTotalPosible = 0; // Suma de todas las preguntas de los tests intentados
+    
+            intentos.forEach(i => {
+                const testInfo = todosLosTests.find(t => t.id === i.test_id);
+                if (!testInfo) return;
+    
+                // --- CAMBIO CLAVE 2: Obtenemos el total real de preguntas del test ---
+                // Supabase devuelve el count en un array: [{count: 80}]
+                const totalPreguntasTest = testInfo.preguntas && testInfo.preguntas[0] ? testInfo.preguntas[0].count : (i.aciertos + i.fallos);
+                
+                // Si el test tiene 0 preguntas (error de datos), usamos lo respondido para evitar dividir por 0
+                const divisor = totalPreguntasTest > 0 ? totalPreguntasTest : (i.aciertos + i.fallos);
+    
+                const bId = testInfo.temas?.bloque_id || 0; 
+                const bloqueNombre = todosLosBloques.find(b => b.id === bId)?.nombre || "OTROS / VARIOS";
+                
+                if (!statsMap[bId]) {
+                    statsMap[bId] = { nombre: bloqueNombre, ok: 0, tot: 0, tests: {} };
+                }
+    
+                // ACUMULAMOS
+                // Nota: Ahora 'tot' representa la suma de preguntas totales de los tests intentados
+                statsMap[bId].tot += divisor;
+                statsMap[bId].ok += i.aciertos;
+    
+                // Actualizamos globales
+                globalTotalPosible += divisor;
+                globalAciertos += i.aciertos;
+    
+                if (!statsMap[bId].tests[i.test_id]) {
+                    statsMap[bId].tests[i.test_id] = { 
+                        nombre: testInfo.nombre, 
+                        identificador: testInfo.identificador,
+                        ok: 0, 
+                        tot: 0 
+                    };
+                }
+                
+                statsMap[bId].tests[i.test_id].tot += divisor;
+                statsMap[bId].tests[i.test_id].ok += i.aciertos;
+            });
+    
+            // RENDERIZADO GLOBALES
+            // Ojo: 'fechas' se mantiene igual (días estudiados)
+            const fechas = [...new Set(intentos.map(i => i.fecha?.split('T')[0]))].length;
+            
+            // Total preguntas contestadas (informativo) vs Nota media
+            // Aquí puedes decidir: ¿Quieres mostrar "Preguntas respondidas" o "Nota Media"?
+            // Mantengo tu lógica de visualización pero con el cálculo corregido:
+            
+            document.getElementById('stat-total-preguntas').innerText = intentos.reduce((a,c)=> a + c.aciertos + c.fallos, 0); // Muestra cuánto has trabajado
+            
+            // El porcentaje ahora es REAL (Nota media ponderada)
+            const porcentajeGlobal = globalTotalPosible > 0 ? ((globalAciertos / globalTotalPosible) * 100).toFixed(1) : "0.0";
+            document.getElementById('stat-acierto-global').innerText = `${porcentajeGlobal}%`;
+            document.getElementById('stat-racha').innerText = fechas;
+    
+            // RENDERIZADO LISTA
+            listBloques.innerHTML = Object.keys(statsMap)
+                .sort((a, b) => {
+                    const nameA = statsMap[a].nombre.toUpperCase();
+                    const nameB = statsMap[b].nombre.toUpperCase();
+                    if (nameA.includes("EXÁMENES") || nameA.includes("SIMULACRO")) return 1;
+                    if (nameB.includes("EXÁMENES") || nameB.includes("SIMULACRO")) return -1;
+                    return a - b;
+                })
+                .map(bId => {
+                    const s = statsMap[bId];
+                    // Cálculo: Aciertos / (Intentos * PreguntasPorTest)
+                    const pBloque = s.tot > 0 ? ((s.ok / s.tot) * 100).toFixed(0) : 0;
+                    const colorBloque = pBloque >= 70 ? 'var(--green)' : pBloque >= 40 ? '#d29922' : 'var(--red)';
+    
+                    return `
+                        <details class="bloque-container">
+                            <summary class="bloque-header">
+                                <div style="flex-grow:1">
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; padding-right:15px;">
+                                        <span>📦 ${s.nombre}</span>
+                                        <span style="color:${colorBloque}">${pBloque}%</span>
                                     </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </details>
-                `;
-            }).join('');
-
-    } catch (err) { 
-        console.error(err); 
-        listBloques.innerHTML = "<p style='color:var(--red)'>Error al cargar estadísticas.</p>"; 
-    }
-},
+                                    <div class="progress-bg" style="margin:0; height:6px;">
+                                        <div class="progress-fill" style="width:${pBloque}%; background:${colorBloque}"></div>
+                                    </div>
+                                </div>
+                            </summary>
+                            <div class="bloque-content">
+                                ${Object.keys(s.tests).map(tId => {
+                                    const t = s.tests[tId];
+                                    const pTest = t.tot > 0 ? ((t.ok / t.tot) * 100).toFixed(0) : 0;
+                                    return `
+                                        <div class="test-row" onclick="app.start(${tId})" style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.02); margin: 4px 0; border-bottom: 1px solid #30363d;">
+                                            <div style="font-size:0.9em;">
+                                                <span class="tag-id">${t.identificador || 'TEST'}</span>
+                                                <strong>${t.nombre}</strong>
+                                            </div>
+                                            <span style="font-weight:bold; color:${pTest >= 70 ? 'var(--green)' : '#888'}">${pTest}%</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </details>
+                    `;
+                }).join('');
+    
+        } catch (err) { 
+            console.error(err); 
+            listBloques.innerHTML = "<p style='color:var(--red)'>Error al cargar estadísticas.</p>"; 
+        }
+    },
 
 confirmarSalida: () => { if(confirm("¿Deseas salir al menú principal?")) location.reload(); },
 
