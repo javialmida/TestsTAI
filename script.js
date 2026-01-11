@@ -731,7 +731,7 @@ resetStats: async () => {
                 .select('pregunta_id, veces_fallada, test_id')
                 .in('test_id', testIds) 
                 .order('veces_fallada', { ascending: false })
-                .limit(30);
+                .limit(50);
 
             if (error) throw error;
 
@@ -847,4 +847,5 @@ document.addEventListener('keydown', (e) => {
             }
         }
     }
+
 });
