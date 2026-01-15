@@ -119,6 +119,13 @@ header {
 .option-btn.selected { border-color: #58a6ff; background: #1c2128; }
 .option-btn.correct { border-color: var(--green); background: rgba(35, 134, 54, 0.15); }
 .option-btn.incorrect { border-color: var(--red); background: rgba(218, 54, 51, 0.15); }
+/* EFECTO HOVER EN OPCIONES DE TEST */
+.option-btn:hover:not(.selected):not(.correct):not(.incorrect) {
+    background: #30363d;       /* Un gris más claro que el fondo actual (#21262d) */
+    border-color: var(--accent); /* Cambia el borde al color lila principal */
+    transform: translateX(5px);  /* Pequeño desplazamiento a la derecha para dar dinamismo */
+    transition: all 0.2s ease;   /* Suaviza la animación */
+}
 
 /* --- ESTADÍSTICAS (BARRAS Y TARJETAS) --- */
 .progress-fill.red { background-color: var(--red) !important; }
@@ -345,4 +352,5 @@ header {
         display: block;
         width: fit-content;
     }
+
 }
