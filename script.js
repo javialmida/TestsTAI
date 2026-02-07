@@ -23,6 +23,29 @@ let state = {
 // --- OBJETO APP PRINCIPAL ---
 const app = {
 
+    fixHTML: (text) => {
+    if (!text) return "";
+    
+    // Buscamos SOLO lo que hay dentro de las etiquetas <pre>...</pre>
+    return text.replace(/<pre>([\s\S]*?)<\/pre>/g, (match, contenido) => {
+        
+        // 1. PRIMERO: El Ampersand (&) -> &amp;
+        let safe = contenido.replace(/&/g, '&amp;');
+        
+        // 2. LUEGO: Los Menor que (<) -> &lt;
+        safe = safe.replace(/</g, '&lt;');
+        
+        // 3. LUEGO: Los Mayor que (>) -> &gt;
+        safe = safe.replace(/>/g, '&gt;');
+        
+        // 4. (Opcional) Comillas dobles (") -> &quot;
+        safe = safe.replace(/"/g, '&quot;');
+
+        // Devolvemos el bloque reconstruido con las etiquetas <pre>
+        return '<pre>' + safe + '</pre>';
+    });
+},
+
     // --- FUNCIONES DEL CRONÓMETRO ---
     startTimer: () => {
         app.stopTimer();
@@ -510,7 +533,9 @@ const app = {
         }
 
         // 3. Inyectamos en el HTML
-        document.getElementById('q-enunciado').innerHTML = `${headerHtml}${state.cur + 1}. ${item.enunciado}`;
+        //document.getElementById('q-enunciado').innerHTML = `${headerHtml}${state.cur + 1}. ${item.enunciado}`;
+        // ENVUELVE item.enunciado CON app.fixHTML(...)
+        document.getElementById('q-enunciado').innerHTML = `${headerHtml}${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
         
         const imgEl = document.getElementById('question-img');
         if (item.imagen_url) {
@@ -531,7 +556,9 @@ const app = {
             if(item['opcion_'+l]){
                 const btn = document.createElement('button');
                 btn.className = 'option-btn';
-                btn.innerHTML = `${l.toUpperCase()}) ${item['opcion_'+l]}`;
+                //btn.innerHTML = `${l.toUpperCase()}) ${item['opcion_'+l]}`;
+                // ENVUELVE item['opcion_'+l] CON app.fixHTML(...)
+                btn.innerHTML = `${l.toUpperCase()}) ${app.fixHTML(item['opcion_'+l])}`;
                 btn.onclick = () => app.handleSelect(l, btn);
                 container.appendChild(btn);
             }
@@ -699,19 +726,19 @@ const app = {
                     </div>
 
                     <div style="margin-bottom: 12px; font-size: 1.05em;">
-                        <strong>${numPregunta}.</strong> ${p.enunciado}
+                        <strong>${numPregunta}.</strong> ${app.fixHTML(p.enunciado)}
                     </div>
 
                     <div style="font-size: 0.95em; margin-bottom: 5px;">
                         <span style="opacity: 0.8;">Tu respuesta:</span>
                         <strong style="color: ${uCol};">
-                            ${res ? res.letra.toUpperCase() + ') ' + p['opcion_' + res.letra] : 'No contestada'}
+                            ${res ? res.letra.toUpperCase() + ') ' + app.fixHTML(p['opcion_' + res.letra]) : 'No contestada'}
                         </strong>
                     </div>
                     <div style="font-size: 0.95em;">
                         <span style="opacity: 0.8;">Respuesta correcta:</span>
                         <strong style="color: var(--green);">
-                            ${p.correcta.toUpperCase()}) ${p['opcion_' + p.correcta.toLowerCase()]}
+                            ${p.correcta.toUpperCase()}) ${app.fixHTML(p['opcion_' + p.correcta.toLowerCase()])}
                         </strong>
                     </div>
                     ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${p.feedback}</div>` : ''}
@@ -874,17 +901,21 @@ const app = {
 
     // --- FUNCIÓN RECUPERADA ---
     confirmarSalida: async () => { 
-        // 1. Borramos el progreso de la nube porque el usuario sale voluntariamente
-        await app.borrarProgreso();
-        
-        // 2. Paramos el timer visualmente
+        // 1. Lo primero es parar el timer visualmente para que no agobie mientras decide
         app.stopTimer(); 
         
-        // 3. Preguntamos
+        // 2. Preguntamos al usuario
         if(confirm("¿Deseas salir al menú principal?")) {
+            
+            // --- AQUÍ ESTÁ EL CAMBIO ---
+            // Solo borramos si el usuario confirma (Acepta)
+            // Usamos await para asegurar que se borre antes de recargar
+            await app.borrarProgreso(); 
+            
             location.reload(); 
         } else {
-            // Si se arrepiente, reanudamos el timer
+            // 3. Si se arrepiente (Cancela), NO hemos borrado nada.
+            // Simplemente reanudamos el timer y sigue jugando.
             app.startTimer(); 
         }
     },
