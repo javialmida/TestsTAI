@@ -25,26 +25,40 @@ const app = {
 
     fixHTML: (text) => {
     if (!text) return "";
-    
-    // Buscamos SOLO lo que hay dentro de las etiquetas <pre>...</pre>
-    return text.replace(/<pre>([\s\S]*?)<\/pre>/g, (match, contenido) => {
-        
-        // 1. PRIMERO: El Ampersand (&) -> &amp;
-        let safe = contenido.replace(/&/g, '&amp;');
-        
-        // 2. LUEGO: Los Menor que (<) -> &lt;
-        safe = safe.replace(/</g, '&lt;');
-        
-        // 3. LUEGO: Los Mayor que (>) -> &gt;
-        safe = safe.replace(/>/g, '&gt;');
-        
-        // 4. (Opcional) Comillas dobles (") -> &quot;
-        safe = safe.replace(/"/g, '&quot;');
 
-        // Devolvemos el bloque reconstruido con las etiquetas <pre>
-        return '<pre>' + safe + '</pre>';
+    // 1. Extraemos los bloques de código <pre> para protegerlos y ponemos un marcador temporal.
+    // Usamos un array para guardar el contenido original de cada bloque.
+    const codeBlocks = [];
+    let protectedText = text.replace(/<pre>([\s\S]*?)<\/pre>/g, (match, contenido) => {
+        codeBlocks.push(contenido);
+        return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
     });
-},
+
+    // 2. Escapamos TODO el texto restante.
+    // Esto convierte "Si x < 5" en "Si x &lt; 5", que es seguro para innerHTML.
+    let safeText = protectedText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    // 3. Restauramos los bloques de código en sus marcadores.
+    // IMPORTANTE: También escapamos el contenido DENTRO del pre para que el código se vea bien.
+    return safeText.replace(/__CODE_BLOCK_(\d+)__/g, (match, index) => {
+        let codeContent = codeBlocks[index];
+        
+        // Escapamos los caracteres dentro del código (ej: for(i < 10))
+        let safeCode = codeContent
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
+        return `<pre>${safeCode}</pre>`;
+    });
+    },
 
     // --- FUNCIONES DEL CRONÓMETRO ---
     startTimer: () => {
