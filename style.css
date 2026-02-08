@@ -80,6 +80,18 @@ header {
 
 #question-box { padding: 40px; max-width: 800px; margin: 0 auto; }
 
+/* --- AÑADE ESTO DEBAJO DE #question-box --- */
+#q-enunciado {
+    font-size: 1.15em;         /* Un pelín más grande para leer mejor */
+    line-height: 1.6;          /* Separación entre líneas */
+    margin-bottom: 25px;       /* Espacio antes de la imagen o botones */
+    
+    /* LA MAGIA PARA QUE NO SE SALGA EL TEXTO */
+    overflow-wrap: anywhere; 
+    word-break: break-word;
+    max-width: 100%;
+}
+
 .test-controls { 
     position: fixed; bottom: 0; left: 0; width: 100%; 
     padding: 20px; background: #161b22; border-top: 1px solid #30363d; 
@@ -128,7 +140,9 @@ header {
 .bloque-container[open] .bloque-header { border-bottom: 1px solid #30363d; color: var(--accent); }
 .bloque-content { padding: 10px; background: rgba(0,0,0,0.1); }
 
-.option-btn { display: block; 
+/* --- SUSTITUYE TU BLOQUE .option-btn POR ESTE --- */
+.option-btn { 
+    display: block; 
     width: 100%; 
     text-align: left; 
     background: #21262d; 
@@ -140,8 +154,15 @@ header {
     cursor: pointer; 
     font-size: 16px; 
     transition: 0.2s;
-    white-space: pre-line;
+    
+    /* --- CAMBIOS PARA EL TEXTO LARGO --- */
+    white-space: normal;      /* Permite saltos de línea naturales */
+    overflow-wrap: anywhere;  /* Rompe palabras kilométricas */
+    word-break: break-word;   /* Compatibilidad extra */
+    height: auto;             /* Deja que el botón crezca si el texto es largo */
+    min-height: 60px;         /* Altura mínima para dedo (móvil) */
 }
+
 .option-btn.selected { border-color: #58a6ff; background: #1c2128; }
 .option-btn.correct { border-color: var(--green); background: rgba(35, 134, 54, 0.15); }
 .option-btn.incorrect { border-color: var(--red); background: rgba(218, 54, 51, 0.15); }
@@ -544,6 +565,8 @@ code {
 pre {
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
+    /* AÑADE ESTA LÍNEA POR SEGURIDAD: */
+    overflow-wrap: anywhere !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
     
