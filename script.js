@@ -61,17 +61,28 @@ const app = {
     },
 
     // --- FUNCIONES DEL CRONÓMETRO ---
-    startTimer: () => {
-        app.stopTimer();
-        //state.seconds = 0;
-        document.getElementById('timer').innerText = "00:00";
-        document.getElementById('timer').classList.remove('hidden');
+    // --- FUNCIONES DEL CRONÓMETRO ---
+startTimer: () => {
+    app.stopTimer(); // Detenemos cualquier reloj anterior
+
+    // --- PROTECCIÓN CONTRA NaN ---
+    // Si state.seconds no existe, es null, o no es un número válido...
+    if (typeof state.seconds !== 'number' || isNaN(state.seconds)) {
+        state.seconds = 0; // ...lo forzamos a 0.
+    }
+
+    // Pintamos el tiempo inicial (ya sea 00:00 o el tiempo recuperado)
+    document.getElementById('timer').innerText = app.formatTime(state.seconds);
+    document.getElementById('timer').classList.remove('hidden');
+    
+    state.timerInterval = setInterval(() => {
+        state.seconds++; // Ahora seguro que suma sobre un número
+        document.getElementById('timer').innerText = app.formatTime(state.seconds);
         
-        state.timerInterval = setInterval(() => {
-            state.seconds++;
-            document.getElementById('timer').innerText = app.formatTime(state.seconds);
-        }, 1000);
-    },
+        // OPCIONAL: Guardar cada 5 segundos para no saturar la base de datos
+        // if (state.seconds % 5 === 0) app.guardarProgreso();
+    }, 1000);
+},
 
     stopTimer: () => {
         if (state.timerInterval) {
