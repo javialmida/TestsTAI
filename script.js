@@ -63,7 +63,7 @@ const app = {
     // --- FUNCIONES DEL CRONÓMETRO ---
     startTimer: () => {
         app.stopTimer();
-        state.seconds = 0;
+        //state.seconds = 0;
         document.getElementById('timer').innerText = "00:00";
         document.getElementById('timer').classList.remove('hidden');
         
@@ -427,7 +427,7 @@ const app = {
 
     resetState: () => {
         app.stopTimer();
-        
+        state.seconds = 0;
         // Guardamos las cachés antes de resetear
         const backupTests = state.testsCache;
         const backupBloques = state.bloquesCache;
@@ -916,11 +916,12 @@ const app = {
     // --- FUNCIÓN RECUPERADA ---
     confirmarSalida: async () => { 
         // 1. Lo primero es parar el timer visualmente para que no agobie mientras decide
-        app.stopTimer(); 
+        // 1. YA NO PARAMOS EL TIMER AQUÍ (app.stopTimer() ELIMINADO)
+        // El reloj seguirá corriendo de fondo mientras el usuario piensa. 
         
         // 2. Preguntamos al usuario
         if(confirm("¿Deseas salir al menú principal?")) {
-            
+            app.stopTimer();
             // --- AQUÍ ESTÁ EL CAMBIO ---
             // Solo borramos si el usuario confirma (Acepta)
             // Usamos await para asegurar que se borre antes de recargar
