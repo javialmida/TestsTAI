@@ -769,10 +769,16 @@ const app = {
                 sb.from('bloques').select('id, nombre'),
                 sb.from('registro_actividad').select('fecha', { count: 'exact', head: true }) 
             ]);
-    
+
             if (intentosRes.error || testsRes.error) throw new Error("Error de red");
             
-            const todosLosIntentos = intentosRes.data || [];
+            let todosLosIntentos = intentosRes.data || [];
+            
+            // --- FIX CRÍTICO: ORDENAR POR FECHA DESCENDENTE ---
+            // Esto asegura que el intento procesado sea siempre el ÚLTIMO (el más reciente).
+            // Si la fecha es igual, usa el ID más alto (que es el último insertado).
+            todosLosIntentos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha) || b.id - a.id);
+
             const diasEstudiados = actividadRes.count || 0;
             
             // Actualizamos la tarjeta de Racha
@@ -787,7 +793,10 @@ const app = {
 
             // --- LÓGICA DE ESTADÍSTICAS POR BLOQUE ---
             const ultimosIntentosPorTest = {};
+            
             todosLosIntentos.forEach(intento => {
+                // Como ya están ordenados por fecha descendente, el primero que entra es el ÚLTIMO realizado.
+                // Si ya existe una entrada para este test_id, la ignoramos (porque sería un intento más viejo).
                 if (!ultimosIntentosPorTest[intento.test_id]) {
                     ultimosIntentosPorTest[intento.test_id] = intento;
                 }
@@ -796,83 +805,89 @@ const app = {
             const statsMap = {};
             const todosLosTests = testsRes.data || [];
             const todosLosBloques = bloquesRes.data || [];
-    
-            Object.values(ultimosIntentosPorTest).forEach(i => {
-               const testInfo = todosLosTests.find(t => t.id === i.test_id);
-               if (!testInfo) return;
-    
-               const bId = testInfo.temas?.bloque_id || 0; 
-               const bloqueNombre = todosLosBloques.find(b => b.id === bId)?.nombre || "OTROS / VARIOS";
-               
-               if (!statsMap[bId]) {
-                   statsMap[bId] = { nombre: bloqueNombre, porcentajesTests: [], testsDetalle: [] };
-               }
 
-               const totalRespondidas = i.aciertos + i.fallos;
-               const pTest = totalRespondidas > 0 ? (i.aciertos / totalRespondidas) * 100 : 0;
-               
-               statsMap[bId].porcentajesTests.push(pTest);
-               statsMap[bId].testsDetalle.push({
-                   id: i.test_id,
-                   nombre: testInfo.nombre,
-                   identificador: testInfo.identificador,
-                   porcentaje: pTest.toFixed(0)
-               });
-            });
-    
-            const todosLosPorcentajes = Object.values(statsMap).flatMap(b => b.porcentajesTests);
-            const porcentajeGlobal = (todosLosPorcentajes.reduce((a, b) => a + b, 0) / todosLosPorcentajes.length).toFixed(1);
-            const totalRespondidasGlobal = todosLosIntentos.reduce((a, c) => a + (c.aciertos + c.fallos), 0);
+            Object.values(ultimosIntentosPorTest).forEach(i => {
+            const testInfo = todosLosTests.find(t => t.id === i.test_id);
+            if (!testInfo) return;
+
+            const bId = testInfo.temas?.bloque_id || 0; 
+            const bloqueNombre = todosLosBloques.find(b => b.id === bId)?.nombre || "OTROS / VARIOS";
             
-            document.getElementById('stat-total-preguntas').innerText = totalRespondidasGlobal;
-            document.getElementById('stat-acierto-global').innerText = `${porcentajeGlobal}%`;
-    
-            listBloques.innerHTML = Object.keys(statsMap)
-                .sort((a, b) => {
-                    const nameA = statsMap[a].nombre.toUpperCase();
-                    const nameB = statsMap[b].nombre.toUpperCase();
-                    if (nameA.includes("EXÁMENES") || nameA.includes("SIMULACRO")) return 1;
-                    if (nameB.includes("EXÁMENES") || nameB.includes("SIMULACRO")) return -1;
-                    return a - b;
-                })
-                .map(bId => {
-                    const s = statsMap[bId];
-                    const pBloque = (s.porcentajesTests.reduce((a, b) => a + b, 0) / s.porcentajesTests.length).toFixed(0);
-                    const colorBloque = pBloque >= 70 ? 'var(--green)' : pBloque >= 40 ? '#d29922' : 'var(--red)';
-    
-                    return `
-                        <details class="bloque-container">
-                            <summary class="bloque-header">
-                                <div style="flex-grow:1">
-                                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; padding-right:15px;">
-                                        <span>📦 ${s.nombre}</span>
-                                        <span style="color:${colorBloque}">${pBloque}%</span>
-                                    </div>
-                                    <div class="progress-bg" style="margin:0; height:6px;">
-                                        <div class="progress-fill" style="width:${pBloque}%; background:${colorBloque}"></div>
-                                    </div>
+            if (!statsMap[bId]) {
+                statsMap[bId] = { nombre: bloqueNombre, porcentajesTests: [], testsDetalle: [] };
+            }
+
+            const totalRespondidas = i.aciertos + i.fallos;
+            const pTest = totalRespondidas > 0 ? (i.aciertos / totalRespondidas) * 100 : 0;
+            
+            statsMap[bId].porcentajesTests.push(pTest);
+            statsMap[bId].testsDetalle.push({
+                id: i.test_id,
+                nombre: testInfo.nombre,
+                identificador: testInfo.identificador,
+                porcentaje: pTest.toFixed(0)
+            });
+        });
+
+        // Calculamos globales basados en estos "últimos intentos"
+        const todosLosPorcentajes = Object.values(statsMap).flatMap(b => b.porcentajesTests);
+        const porcentajeGlobal = (todosLosPorcentajes.reduce((a, b) => a + b, 0) / todosLosPorcentajes.length).toFixed(1);
+        
+        // Para el total de preguntas contestadas históricamente, sí usamos todosLosIntentos original
+        // (o puedes usar solo los últimos si prefieres "preguntas en intentos vigentes", 
+        // pero normalmente "Total Preguntas" es histórico. Lo dejo histórico aquí:)
+        const totalRespondidasGlobal = todosLosIntentos.reduce((a, c) => a + (c.aciertos + c.fallos), 0);
+        
+        document.getElementById('stat-total-preguntas').innerText = totalRespondidasGlobal;
+        document.getElementById('stat-acierto-global').innerText = `${porcentajeGlobal}%`;
+
+        listBloques.innerHTML = Object.keys(statsMap)
+            .sort((a, b) => {
+                const nameA = statsMap[a].nombre.toUpperCase();
+                const nameB = statsMap[b].nombre.toUpperCase();
+                if (nameA.includes("EXÁMENES") || nameA.includes("SIMULACRO")) return 1;
+                if (nameB.includes("EXÁMENES") || nameB.includes("SIMULACRO")) return -1;
+                return a - b;
+            })
+            .map(bId => {
+                const s = statsMap[bId];
+                // La media del bloque es la media de tus ÚLTIMAS notas
+                const pBloque = (s.porcentajesTests.reduce((a, b) => a + b, 0) / s.porcentajesTests.length).toFixed(0);
+                const colorBloque = pBloque >= 70 ? 'var(--green)' : pBloque >= 40 ? '#d29922' : 'var(--red)';
+
+                return `
+                    <details class="bloque-container">
+                        <summary class="bloque-header">
+                            <div style="flex-grow:1">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px; padding-right:15px;">
+                                    <span>📦 ${s.nombre}</span>
+                                    <span style="color:${colorBloque}">${pBloque}%</span>
                                 </div>
-                            </summary>
-                            <div class="bloque-content">
-                                ${s.testsDetalle.map(t => `
-                                    <div class="test-row" onclick="app.start(${t.id})" style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.02); margin: 4px 0; border-bottom: 1px solid #30363d;">
-                                        <div style="font-size:0.9em;">
-                                            <span class="tag-id">${t.identificador || 'TEST'}</span>
-                                            <strong>${t.nombre}</strong>
-                                        </div>
-                                        <span style="font-weight:bold; color:${t.porcentaje >= 70 ? 'var(--green)' : '#888'}">${t.porcentaje}%</span>
-                                    </div>
-                                `).join('')}
+                                <div class="progress-bg" style="margin:0; height:6px;">
+                                    <div class="progress-fill" style="width:${pBloque}%; background:${colorBloque}"></div>
+                                </div>
                             </div>
-                        </details>
-                    `;
-                }).join('');
-    
-        } catch (err) { 
-            console.error("Error Dashboard:", err); 
-            listBloques.innerHTML = `<p style='color:var(--red); text-align:center;'>Error al cargar estadísticas: ${err.message}</p>`; 
-        }
-    },
+                        </summary>
+                        <div class="bloque-content">
+                            ${s.testsDetalle.map(t => `
+                                <div class="test-row" onclick="app.start(${t.id})" style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.02); margin: 4px 0; border-bottom: 1px solid #30363d;">
+                                    <div style="font-size:0.9em;">
+                                        <span class="tag-id">${t.identificador || 'TEST'}</span>
+                                        <strong>${t.nombre}</strong>
+                                    </div>
+                                    <span style="font-weight:bold; color:${t.porcentaje >= 70 ? 'var(--green)' : '#888'}">${t.porcentaje}%</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </details>
+                `;
+            }).join('');
+
+    } catch (err) { 
+        console.error("Error Dashboard:", err); 
+        listBloques.innerHTML = `<p style='color:var(--red); text-align:center;'>Error al cargar estadísticas: ${err.message}</p>`; 
+    }
+},
 
     confirmarSalida: async () => { 
         if(confirm("¿Deseas salir al menú principal?")) {
