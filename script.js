@@ -947,6 +947,8 @@ const app = {
             const etiqueta = modo === 'fallos' ? 'REPASO FALLOS' : 'TEST TEMA';
             state.currentTestName = `${icono} ${etiqueta}: ${nombreTema} (${state.q.length})`;
             state.currentTestId = null; 
+            
+            state.mode = document.querySelector('input[name="modo"]:checked').value; //NUEVO***************** MANTER EL MODO ELEGIDO (ESTUDIO / EXAMEN)
 
             app.switchView('view-test');
             document.getElementById('modal-temas').classList.add('hidden');
@@ -988,6 +990,8 @@ const app = {
             const textoModo = modo === 'fallos' ? 'REPASO FALLOS: ' : ''; 
             state.currentTestName = `${icono} ${textoModo}${nombreTest} (${state.q.length})`;
             state.currentTestId = testId;
+            
+            state.mode = document.querySelector('input[name="modo"]:checked').value; //NUEVO***************** MANTER EL MODO ELEGIDO (ESTUDIO / EXAMEN)
 
             app.switchView('view-test');
             document.getElementById('modal-temas').classList.add('hidden');
