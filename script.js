@@ -31,8 +31,9 @@ const app = {
             return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
         });
 
+        // Regex inteligente: Sólo escapa el '&' si NO forma parte de una entidad ya escapada
         let safeText = protectedText
-            .replace(/&/g, "&amp;")
+            .replace(/&(?!(?:[a-zA-Z0-9]+|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
@@ -41,7 +42,7 @@ const app = {
         return safeText.replace(/__CODE_BLOCK_(\d+)__/g, (match, index) => {
             let codeContent = codeBlocks[index];
             let safeCode = codeContent
-                .replace(/&/g, "&amp;")
+                .replace(/&(?!(?:[a-zA-Z0-9]+|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
@@ -525,9 +526,11 @@ const app = {
             if (l === userSel && userSel !== correcta) b.classList.add('incorrect');
         });
         if (userSel !== correcta) await app.registrarError(item.id, item.test_id);
+        
         if (item.feedback) { 
             const fbDiv = document.getElementById('q-feedback');
-            fbDiv.innerText = "💡 " + item.feedback;
+            // Cambiamos innerText por innerHTML y aplicamos fixHTML
+            fbDiv.innerHTML = "💡 " + app.fixHTML(item.feedback);
             fbDiv.classList.remove('hidden');
         }
         state.status = 'done';
@@ -690,7 +693,7 @@ const app = {
                             ${p.correcta.toUpperCase()}) ${app.fixHTML(p['opcion_' + p.correcta.toLowerCase()])}
                         </strong>
                     </div>
-                    ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${p.feedback}</div>` : ''}
+                    ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${app.fixHTML(p.feedback)}</div>` : ''}
                 </div>`;
         }).join('');
         
