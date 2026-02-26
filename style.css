@@ -404,7 +404,7 @@ header {
 /* --- MARCO CON SCROLL PARA EXÁMENES --- */
 .scroll-frame {
     /* Altura fija (aprox 4 botones). Ajusta los px si quieres más o menos altura */
-    max-height: 200px; 
+    max-height: 238px; 
     
     /* Esto activa la magia: si se pasa de altura, sale scroll */
     overflow-y: auto; 
@@ -611,3 +611,4 @@ pre {
     animation: fadeIn 0.5s ease;
     box-shadow: 0 4px 15px rgba(0,0,0,0.5); /* Un toque extra de profundidad */
 }
+
