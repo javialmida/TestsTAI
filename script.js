@@ -281,7 +281,7 @@ const app = {
                 if (testsValidos.length === 0) return alert("Has completado tests, pero ninguno es 'Por Tema'.");
 
                 const slider = document.getElementById('simulacro-range');
-                const limitePreguntas = slider ? parseInt(slider.value, 10) : 100;
+                const limitePreguntas = slider ? parseInt(slider.value, 10) : 110;
                 const modoRadio = document.querySelector('input[name="simulacro-modo"]:checked');
                 const modo = modoRadio ? modoRadio.value : 'todo'; 
 
@@ -917,7 +917,7 @@ const app = {
     prepararRepasoPorNombreTema: async (nombreTema) => {
         try {
             const slider = document.getElementById('tema-range');
-            const limite = slider ? parseInt(slider.value, 10) : 100;
+            const limite = slider ? parseInt(slider.value, 10) : 110;
             const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
             const modo = modoRadio ? modoRadio.value : 'fallos'; 
 
@@ -964,7 +964,7 @@ const app = {
     prepararRepasoPorTestId: async (testId, nombreTest) => {
         try {
             const slider = document.getElementById('tema-range');
-            const limite = slider ? parseInt(slider.value, 10) : 100;
+            const limite = slider ? parseInt(slider.value, 10) : 110;
             const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
             const modo = modoRadio ? modoRadio.value : 'fallos';
 
@@ -1087,7 +1087,7 @@ const app = {
 
             document.getElementById('modal-temas').classList.add('hidden');
             const slider = document.getElementById('tema-range');
-            const limite = slider ? parseInt(slider.value, 10) : 50; 
+            const limite = slider ? parseInt(slider.value, 10) : 110; 
             const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
             const modo = modoRadio ? modoRadio.value : 'todo'; 
             const mapTestIdToSeleccion = {};
