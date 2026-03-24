@@ -78,9 +78,10 @@
                             
                             <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: var(--text); margin-bottom: 5px;">
                                 <span>Nº Preguntas:</span>
-                                <span id="tema-val" style="color: var(--accent); font-weight: 800; font-size: 1.1em;">100</span>
+                                <span id="tema-val" style="color: var(--accent); font-weight: 800; font-size: 1.1em;">110</span>
                             </div>
-                            <input type="range" id="tema-range" min="1" max="100" value="100" step="1"
+                            <!-- LÍMITE DE PREGUNTAS REPASO POR TEMA -->
+                            <input type="range" id="tema-range" min="1" max="110" value="110" step="1" 
                                 style="width: 100%; cursor: pointer; accent-color: var(--accent); height: 6px; margin-bottom: 12px;"
                                 oninput="document.getElementById('tema-val').innerText = this.value">
 
@@ -109,9 +110,10 @@
                             
                             <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: var(--text); margin-bottom: 5px;">
                                 <span>Nº Preguntas:</span>
-                                <span id="simulacro-val" style="color: var(--accent); font-weight: 800; font-size: 1.1em;">100</span>
+                                <span id="simulacro-val" style="color: var(--accent); font-weight: 800; font-size: 1.1em;">110</span>
                             </div>
-                            <input type="range" id="simulacro-range" min="1" max="100" value="100" step="1"
+                            <!-- LÍMITE DE PREGUNTAS SIMULACRO TOTAL -->
+                            <input type="range" id="simulacro-range" min="1" max="110" value="110" step="1"
                                 style="width: 100%; cursor: pointer; accent-color: var(--accent); height: 6px; margin-bottom: 12px;"
                                 oninput="document.getElementById('simulacro-val').innerText = this.value">
 
