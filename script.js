@@ -1007,77 +1007,129 @@ const app = {
     startRepasoTema: (nombre) => { app.prepararRepasoPorNombreTema(nombre); },
 
     abrirModalRepasoTema: () => {
-        const modal = document.getElementById('modal-temas');
-        const listContainer = document.getElementById('lista-temas-repaso');
-        const spanCount = document.getElementById('count-sel');
-        if(spanCount) spanCount.innerText = "0";
-        listContainer.innerHTML = "";
-        modal.classList.remove('hidden');
+    const modal = document.getElementById('modal-temas');
+    const listContainer = document.getElementById('lista-temas-repaso');
+    const spanCount = document.getElementById('count-sel');
+    if(spanCount) spanCount.innerText = "0";
+    listContainer.innerHTML = "";
+    modal.classList.remove('hidden');
 
-        if (!state.bloquesCache || !state.testsCache) {
-            listContainer.innerHTML = "<p>Cargando datos...</p>";
-            return;
+    if (!state.bloquesCache || !state.testsCache) {
+        listContainer.innerHTML = "<p>Cargando datos...</p>";
+        return;
+    }
+
+    // --- Checkbox SELECCIONAR TODO ---
+    const selectAllDiv = document.createElement('div');
+    selectAllDiv.style = "margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #30363d;";
+    selectAllDiv.innerHTML = `
+        <label style="font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" id="chk-select-all" onchange="app.toggleAllTemas(this.checked)">
+            ✅ SELECCIONAR TODO
+        </label>
+    `;
+    listContainer.appendChild(selectAllDiv);
+
+    const bloquesOrdenados = [...state.bloquesCache].sort((a, b) => {
+        const nameA = a.nombre.toUpperCase();
+        const nameB = b.nombre.toUpperCase();
+        if (nameA.includes("EXÁMENES") || nameA.includes("SIMULACRO")) return 1;
+        if (nameB.includes("EXÁMENES") || nameB.includes("SIMULACRO")) return -1;
+        return nameA.localeCompare(nameB, undefined, { numeric: true });
+    });
+
+    bloquesOrdenados.forEach(bloque => {
+        const testsDelBloque = state.testsCache.filter(t => t.temas && t.temas.bloque_id === bloque.id);
+        if (testsDelBloque.length === 0) return;
+
+        const esBloqueExamen = bloque.nombre.toUpperCase().includes("EXÁMENES") || 
+                               bloque.nombre.toUpperCase().includes("SIMULACRO") || 
+                               bloque.nombre.toUpperCase().includes("OFICIAL");
+
+        let itemsParaMostrar = [];
+        if (esBloqueExamen) {
+            testsDelBloque.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true }));
+            itemsParaMostrar = testsDelBloque.map(t => ({
+                label: t.nombre, valor: t.nombre, esTest: true, id: t.id
+            }));
+        } else {
+            const temasUnicos = [...new Set(testsDelBloque.map(t => t.temas.nombre))].sort();
+            itemsParaMostrar = temasUnicos.map(tema => ({
+                label: tema, valor: tema, esTest: false
+            }));
         }
 
-        const bloquesOrdenados = [...state.bloquesCache].sort((a, b) => {
-            const nameA = a.nombre.toUpperCase();
-            const nameB = b.nombre.toUpperCase();
-            if (nameA.includes("EXÁMENES") || nameA.includes("SIMULACRO")) return 1;
-            if (nameB.includes("EXÁMENES") || nameB.includes("SIMULACRO")) return -1;
-            return nameA.localeCompare(nameB, undefined, { numeric: true });
-        });
+        const bloqueId = `bloque-${bloque.id}`;
+        const detalles = document.createElement('details');
+        detalles.className = 'bloque-container';
 
-        bloquesOrdenados.forEach(bloque => {
-            const testsDelBloque = state.testsCache.filter(t => t.temas && t.temas.bloque_id === bloque.id);
-            if (testsDelBloque.length === 0) return;
+        const itemsHtml = itemsParaMostrar.map(item => {
+            const safeValor = item.valor.replace(/'/g, "\\'");
+            const clickFunction = item.esTest
+                ? `app.prepararRepasoPorTestId(${item.id}, '${safeValor}')`
+                : `app.prepararRepasoPorNombreTema('${safeValor}')`;
+            return `
+                <div class="tema-row">
+                    <span class="tema-label" onclick="${clickFunction}">
+                        ${item.esTest ? '📄 ' : ''}${item.label}
+                    </span>
+                    <input type="checkbox" class="tema-chk" data-bloque="${bloqueId}" value="${item.valor}" onchange="app.updateMultiCount()">
+                </div>`;
+        }).join('');
 
-            const esBloqueExamen = bloque.nombre.toUpperCase().includes("EXÁMENES") || 
-                                   bloque.nombre.toUpperCase().includes("SIMULACRO") || 
-                                   bloque.nombre.toUpperCase().includes("OFICIAL");
-
-            let itemsParaMostrar = [];
-            if (esBloqueExamen) {
-                testsDelBloque.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true }));
-                itemsParaMostrar = testsDelBloque.map(t => ({
-                    label: t.nombre, valor: t.nombre, esTest: true, id: t.id
-                }));
-            } else {
-                const temasUnicos = [...new Set(testsDelBloque.map(t => t.temas.nombre))].sort();
-                itemsParaMostrar = temasUnicos.map(tema => ({
-                    label: tema, valor: tema, esTest: false
-                }));
-            }
-
-            const detalles = document.createElement('details');
-            detalles.className = 'bloque-container';
-            const itemsHtml = itemsParaMostrar.map(item => {
-                const safeValor = item.valor.replace(/'/g, "\\'");
-                const clickFunction = item.esTest ? `app.prepararRepasoPorTestId(${item.id}, '${safeValor}')` : `app.prepararRepasoPorNombreTema('${safeValor}')`;
-                return `
-                    <div class="tema-row">
-                        <span class="tema-label" onclick="${clickFunction}">
-                            ${item.esTest ? '📄 ' : ''}${item.label}
-                        </span>
-                        <input type="checkbox" class="tema-chk" value="${item.valor}" onchange="app.updateMultiCount()">
-                    </div>`;
-            }).join('');
-
-            detalles.innerHTML = `
-                <summary class="bloque-header">
-                    <span>📦 ${bloque.nombre}</span>
+        detalles.innerHTML = `
+            <summary class="bloque-header">
+                <span>📦 ${bloque.nombre}</span>
+                <div style="display: flex; align-items: center; gap: 12px;">
                     <small>${itemsParaMostrar.length} ${esBloqueExamen ? 'tests' : 'temas'}</small>
-                </summary>
-                <div class="bloque-content">${itemsHtml}</div>
-            `;
-            listContainer.appendChild(detalles);
-        });
-    },
+                    <input type="checkbox" class="bloque-chk" data-bloque="${bloqueId}"
+                        title="Seleccionar todo el bloque"
+                        onclick="event.stopPropagation()"
+                        onchange="app.toggleBloque('${bloqueId}', this.checked)">
+                </div>
+            </summary>
+            <div class="bloque-content" id="${bloqueId}">${itemsHtml}</div>
+        `;
+        listContainer.appendChild(detalles);
+    });
+},
 
     updateMultiCount: () => {
-        const checked = document.querySelectorAll('.tema-chk:checked').length;
-        const span = document.getElementById('count-sel');
-        if(span) span.innerText = checked;
+    const checkboxes = document.querySelectorAll('.tema-chk');
+    const checkedBoxes = document.querySelectorAll('.tema-chk:checked');
+    const span = document.getElementById('count-sel');
+    if (span) span.innerText = checkedBoxes.length;
+
+    // Actualizar checkbox "Seleccionar todo"
+    const chkAll = document.getElementById('chk-select-all');
+    if (chkAll) {
+        chkAll.checked = (checkboxes.length > 0 && checkboxes.length === checkedBoxes.length);
+    }
+
+    // Actualizar checkbox de cada bloque según sus temas
+    document.querySelectorAll('.bloque-chk').forEach(chkBloque => {
+        const bloqueId = chkBloque.dataset.bloque;
+        const temasDelBloque = document.querySelectorAll(`.tema-chk[data-bloque="${bloqueId}"]`);
+        const marcadosDelBloque = document.querySelectorAll(`.tema-chk[data-bloque="${bloqueId}"]:checked`);
+        if (temasDelBloque.length > 0) {
+            chkBloque.checked = (temasDelBloque.length === marcadosDelBloque.length);
+            chkBloque.indeterminate = (marcadosDelBloque.length > 0 && marcadosDelBloque.length < temasDelBloque.length);
+        }
+    });
+},
+
+    toggleAllTemas: (marcado) => {
+        const checkboxes = document.querySelectorAll('.tema-chk');
+        checkboxes.forEach(chk => chk.checked = marcado);
+        app.updateMultiCount();
     },
+
+    toggleBloque: (bloqueId, marcado) => {
+    document.querySelectorAll(`.tema-chk[data-bloque="${bloqueId}"]`).forEach(chk => {
+        chk.checked = marcado;
+    });
+    app.updateMultiCount();
+},
 
     startRepasoMultiTema: async () => {
         try {
