@@ -612,3 +612,14 @@ pre {
     box-shadow: 0 4px 15px rgba(0,0,0,0.5); /* Un toque extra de profundidad */
 }
 
+#chk-select-all {
+transform: scale(1.3); 
+cursor: pointer;
+margin-right: 5px; 
+}
+
+.bloque-chk {
+    transform: scale(1.3); 
+cursor: pointer;
+margin-right: 5px;
+}
