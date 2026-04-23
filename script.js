@@ -153,10 +153,18 @@ const app = {
 
             // Carga inicial de datos
             const [testsRes, bloquesRes, intentosRes] = await Promise.all([
-                sb.from('tests').select(`id, nombre, tipo, identificador, visible, info, temas (nombre, bloque_id)`).eq('visible', true),
+                sb.from('tests').select(`id, nombre, tipo, identificador, visible, info, temas!tema_id (nombre, bloque_id)`).eq('visible', true),
                 sb.from('bloques').select('id, nombre'),
                 sb.from('intentos').select('test_id, completado')
             ]);
+
+            //DEBUG--------------------------------------------------------------------------------
+            console.log("Tests cargados:", testsRes.data?.map(t => ({
+                id: t.id,
+                nombre: t.nombre,
+                temas: t.temas
+            })));
+            //-------------------------------------------------------------------------------------
             
             if (testsRes.error) throw testsRes.error;
             const tests = testsRes.data;
@@ -259,113 +267,122 @@ const app = {
 
     // --- PREPARAR REPASOS Y TESTS ---
     prepararRepaso: async (tipo) => {
-        try {
-            app.resetState();
-            let ids = []; 
+    try {
+        app.resetState();
+        let ids = []; 
 
-            if (!state.testsCache) {
-                const { data: testsCargados, error: errCache } = await sb.from('tests').select('*');
-                if (errCache) throw errCache;
-                state.testsCache = testsCargados;
+        if (!state.testsCache) {
+            const { data: testsCargados, error: errCache } = await sb.from('tests').select('*');
+            if (errCache) throw errCache;
+            state.testsCache = testsCargados;
+        }
+
+        if (tipo === 'simulacro') {
+            const { data: intentos } = await sb.from('intentos').select('test_id').eq('completado', true);
+            if (!intentos || intentos.length === 0) return alert("¡Aún no has completado ningún test para generar un simulacro!");
+
+            const testIdsCompletados = [...new Set(intentos.map(i => i.test_id))];
+            const testsValidos = state.testsCache.filter(t => 
+                testIdsCompletados.includes(t.id) && t.tipo === 'test_por_tema'
+            ).map(t => t.id);
+
+            if (testsValidos.length === 0) return alert("Has completado tests, pero ninguno es 'Por Tema'.");
+
+            const slider = document.getElementById('simulacro-range');
+            const limitePreguntas = slider ? parseInt(slider.value, 10) : 110;
+            const modoRadio = document.querySelector('input[name="simulacro-modo"]:checked');
+            const modo = modoRadio ? modoRadio.value : 'todo'; 
+
+            let rawData = [];
+            if (modo === 'fallos') {
+                const { data: errores, error } = await sb.from('errores').select('pregunta_id, test_id').in('test_id', testsValidos);
+                if (error) throw error;
+                if (!errores || errores.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en tus tests completados.");
+                rawData = errores.map(e => ({ id: e.pregunta_id, test_id: e.test_id }));
+            } else {
+                const { data, error } = await sb.from('preguntas').select('id, test_id').in('test_id', testsValidos);
+                if (error) throw error;
+                rawData = data;
             }
 
-            if (tipo === 'simulacro') {
-                const { data: intentos } = await sb.from('intentos').select('test_id').eq('completado', true);
-                if (!intentos || intentos.length === 0) return alert("¡Aún no has completado ningún test para generar un simulacro!");
+            if (!rawData || rawData.length === 0) return alert("Error: No se encontraron preguntas disponibles.");
 
-                const testIdsCompletados = [...new Set(intentos.map(i => i.test_id))];
-                const testsValidos = state.testsCache.filter(t => 
-                    testIdsCompletados.includes(t.id) && t.tipo === 'test_por_tema'
-                ).map(t => t.id);
+            const bolsasPorTema = {};
+            rawData.forEach(p => {
+                if (!bolsasPorTema[p.test_id]) bolsasPorTema[p.test_id] = [];
+                bolsasPorTema[p.test_id].push(p.id);
+            });
 
-                if (testsValidos.length === 0) return alert("Has completado tests, pero ninguno es 'Por Tema'.");
+            Object.values(bolsasPorTema).forEach(lista => lista.sort(() => Math.random() - 0.5));
 
-                const slider = document.getElementById('simulacro-range');
-                const limitePreguntas = slider ? parseInt(slider.value, 10) : 110;
-                const modoRadio = document.querySelector('input[name="simulacro-modo"]:checked');
-                const modo = modoRadio ? modoRadio.value : 'todo'; 
+            ids = [];
+            const keys = Object.keys(bolsasPorTema);
+            let buscando = true;
 
-                let rawData = [];
-
-                if (modo === 'fallos') {
-                    const { data: errores, error } = await sb.from('errores').select('pregunta_id, test_id').in('test_id', testsValidos);
-                    if (error) throw error;
-                    if (!errores || errores.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en tus tests completados.");
-                    rawData = errores.map(e => ({ id: e.pregunta_id, test_id: e.test_id }));
-                } else {
-                    const { data, error } = await sb.from('preguntas').select('id, test_id').in('test_id', testsValidos);
-                    if (error) throw error;
-                    rawData = data;
-                }
-
-                if (!rawData || rawData.length === 0) return alert("Error: No se encontraron preguntas disponibles.");
-
-                const bolsasPorTema = {};
-                rawData.forEach(p => {
-                    if (!bolsasPorTema[p.test_id]) bolsasPorTema[p.test_id] = [];
-                    bolsasPorTema[p.test_id].push(p.id);
-                });
-
-                Object.values(bolsasPorTema).forEach(lista => lista.sort(() => Math.random() - 0.5));
-
-                ids = [];
-                const keys = Object.keys(bolsasPorTema);
-                let buscando = true;
-
-                while (ids.length < limitePreguntas && buscando) {
-                    buscando = false; 
-                    for (const key of keys) {
-                        if (ids.length >= limitePreguntas) break; 
-                        if (bolsasPorTema[key].length > 0) {
-                            ids.push(bolsasPorTema[key].pop()); 
-                            buscando = true; 
-                        }
+            while (ids.length < limitePreguntas && buscando) {
+                buscando = false; 
+                for (const key of keys) {
+                    if (ids.length >= limitePreguntas) break; 
+                    if (bolsasPorTema[key].length > 0) {
+                        ids.push(bolsasPorTema[key].pop()); 
+                        buscando = true; 
                     }
                 }
-                
-                const icono = modo === 'fallos' ? '⚠️' : '🤖';
-                state.currentTestName = `${icono} SIMULACRO (${ids.length} PREGUNTAS)`;
             }
-            else { 
-                let query = sb.from('errores').select('pregunta_id, veces_fallada, ultimo_fallo');
-                if (tipo === 'critico') {
-                    query = query.order('veces_fallada', { ascending: false }).limit(30);
-                    state.currentTestName = "🔥 MODO CRÍTICO";
-                } else if (tipo === 'express') {
-                    query = query.order('ultimo_fallo', { ascending: false }).limit(100); 
-                    state.currentTestName = "⚡ REPASO EXPRESS";
-                } else if (tipo === 'semanal') {
-                    const unaSemanaAtras = new Date();
-                    unaSemanaAtras.setDate(unaSemanaAtras.getDate() - 7);
-                    query = query.gte('ultimo_fallo', unaSemanaAtras.toISOString()).order('ultimo_fallo', { ascending: false }).limit(50);
-                    state.currentTestName = "📅 REPASO SEMANAL";
-                }
-
-                const { data: listaErrores, error: errErr } = await query;
-                if (errErr) throw errErr;
-                if (!listaErrores || listaErrores.length === 0) return alert("¡Sin fallos registrados para este modo!");
-                
-                ids = listaErrores.map(e => e.pregunta_id);
-                if (tipo === 'express') ids = ids.sort(() => Math.random() - 0.5).slice(0, 20);
-            }
-
-            const { data: preguntas, error: errP } = await sb.from('preguntas').select('*').in('id', ids);
-            if (errP) throw errP;
-
-            state.q = preguntas.sort(() => Math.random() - 0.5);
-            state.mode = document.querySelector('input[name="modo"]:checked').value;
-            state.currentIntentoId = null; 
-
-            app.switchView('view-test');
-            document.getElementById('btn-salir').classList.remove('hidden');
-            app.startTimer(); 
-            app.render();
-
-        } catch (error) { 
-            console.error(error); 
-            alert("Ocurrió un error al generar el repaso.");
+            
+            const icono = modo === 'fallos' ? '⚠️' : '🤖';
+            state.currentTestName = `${icono} SIMULACRO (${ids.length} PREGUNTAS)`;
         }
-    },
+        else { 
+            let query = sb.from('errores').select('pregunta_id, veces_fallada, ultimo_fallo');
+            if (tipo === 'critico') {
+                query = query.order('veces_fallada', { ascending: false }).limit(30);
+                state.currentTestName = "🔥 MODO CRÍTICO";
+            } else if (tipo === 'express') {
+                query = query.order('ultimo_fallo', { ascending: false }).limit(100); 
+                state.currentTestName = "⚡ REPASO EXPRESS";
+            } else if (tipo === 'semanal') {
+                const unaSemanaAtras = new Date();
+                unaSemanaAtras.setDate(unaSemanaAtras.getDate() - 7);
+                query = query.gte('ultimo_fallo', unaSemanaAtras.toISOString()).order('ultimo_fallo', { ascending: false }).limit(50);
+                state.currentTestName = "📅 REPASO SEMANAL";
+            }
+
+            const { data: listaErrores, error: errErr } = await query;
+            if (errErr) throw errErr;
+            if (!listaErrores || listaErrores.length === 0) return alert("¡Sin fallos registrados para este modo!");
+            
+            ids = listaErrores.map(e => e.pregunta_id);
+            if (tipo === 'express') ids = ids.sort(() => Math.random() - 0.5).slice(0, 20);
+        }
+
+        const { data: preguntas, error: errP } = await sb.from('preguntas').select('*').in('id', ids);
+        if (errP) throw errP;
+
+        state.q = preguntas.sort(() => Math.random() - 0.5);
+        state.mode = document.querySelector('input[name="modo"]:checked').value;
+
+        // --- NUEVO: Crear intento para el repaso ---
+        const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+            test_id: null,
+            nombre_repaso: state.currentTestName,
+            aciertos: 0,
+            fallos: 0,
+            arriesgadas: 0
+        }]).select().single();
+        if (!errorIntento && intento) state.currentIntentoId = intento.id;
+        // -------------------------------------------
+
+        app.switchView('view-test');
+        document.getElementById('btn-salir').classList.remove('hidden');
+        app.startTimer(); 
+        app.render();
+
+    } catch (error) { 
+        console.error(error); 
+        alert("Ocurrió un error al generar el repaso.");
+    }
+},
 
     resetState: () => {
         app.stopTimer();
@@ -422,7 +439,13 @@ const app = {
             state.currentIntentoId = intento.id;
 
             app.switchView('view-test');
-            document.getElementById('btn-salir').classList.remove('hidden');
+            //document.getElementById('btn-salir').classList.remove('hidden');
+            //NUEVO----------------------------------------------------------
+            const btnSalir = document.getElementById('btn-salir');
+            btnSalir.classList.remove('hidden');
+            btnSalir.textContent = 'SALIR';
+            btnSalir.onclick = app.confirmarSalida;
+            //---------------------------------------------------------------
             app.startTimer();
             app.render();
         } catch (err) { alert(err.message); }
@@ -570,7 +593,16 @@ const app = {
         await app.borrarProgreso(); 
         
         app.switchView('view-results');
-        document.getElementById('btn-salir').classList.add('hidden');
+        //document.getElementById('btn-salir').classList.add('hidden');
+        //NUEVO----------------------------------------------------------
+        const btnSalir = document.getElementById('btn-salir');
+        btnSalir.classList.remove('hidden');
+        btnSalir.textContent = 'VOLVER';
+        btnSalir.onclick = () => {
+            app.switchView('view-menu');
+            btnSalir.classList.add('hidden');
+        };
+        //----------------------------------------------------------------
         document.getElementById('counter').classList.add('hidden');
 
         const total = state.q.length;
@@ -626,9 +658,21 @@ const app = {
         state.ans = d.ans;
         state.currentTestName = h.nombre;
 
+        //app.switchView('view-results');
+        //document.getElementById('btn-salir').classList.remove('hidden'); 
+        //document.getElementById('counter').classList.add('hidden');
+
+        //NUEVO-----------------------------------------------------------------------------
         app.switchView('view-results');
-        document.getElementById('btn-salir').classList.remove('hidden'); 
+        const btnSalir = document.getElementById('btn-salir');
+        btnSalir.classList.remove('hidden');
+        btnSalir.textContent = 'VOLVER';
+        btnSalir.onclick = () => {
+            app.switchView('view-menu');
+            btnSalir.classList.add('hidden');
+        };
         document.getElementById('counter').classList.add('hidden');
+        //----------------------------------------------------------------------------------
 
         document.getElementById('final-stats').innerHTML = `
             <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
@@ -768,7 +812,7 @@ const app = {
         try {
             const [intentosRes, testsRes, bloquesRes, actividadRes] = await Promise.all([
                 sb.from('intentos').select('*').eq('completado', true),
-                sb.from('tests').select('id, nombre, identificador, temas(nombre, bloque_id)'), 
+                sb.from('tests').select('id, nombre, identificador, temas!tema_id(nombre, bloque_id)'), 
                 sb.from('bloques').select('id, nombre'),
                 sb.from('registro_actividad').select('fecha', { count: 'exact', head: true }) 
             ]);
@@ -915,94 +959,114 @@ const app = {
     },
 
     prepararRepasoPorNombreTema: async (nombreTema) => {
-        try {
-            const slider = document.getElementById('tema-range');
-            const limite = slider ? parseInt(slider.value, 10) : 110;
-            const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
-            const modo = modoRadio ? modoRadio.value : 'fallos'; 
+    try {
+        const slider = document.getElementById('tema-range');
+        const limite = slider ? parseInt(slider.value, 10) : 110;
+        const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
+        const modo = modoRadio ? modoRadio.value : 'fallos'; 
 
-            const testsDelTema = state.testsCache.filter(t => t.temas && t.temas.nombre === nombreTema);
-            const idsTests = testsDelTema.map(t => t.id);
-            if (idsTests.length === 0) return alert("No hay tests asociados a este tema.");
+        const testsDelTema = state.testsCache.filter(t => t.temas && t.temas.nombre === nombreTema);
+        const idsTests = testsDelTema.map(t => t.id);
+        if (idsTests.length === 0) return alert("No hay tests asociados a este tema.");
 
-            let rawData = [];
-            if (modo === 'fallos') {
-                const { data: fallos, error: errorFallos } = await sb.from('errores').select('pregunta_id').in('test_id', idsTests);
-                if (errorFallos) throw errorFallos;
-                if (!fallos || fallos.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en este tema.");
-                const idsPreguntas = fallos.map(f => f.pregunta_id);
-                const { data, error } = await sb.from('preguntas').select('*').in('id', idsPreguntas);
-                if (error) throw error;
-                rawData = data;
-            } else {
-                const { data, error } = await sb.from('preguntas').select('*').in('test_id', idsTests);
-                if (error) throw error;
-                rawData = data;
-            }
+        let rawData = [];
+        if (modo === 'fallos') {
+            const { data: fallos, error: errorFallos } = await sb.from('errores').select('pregunta_id').in('test_id', idsTests);
+            if (errorFallos) throw errorFallos;
+            if (!fallos || fallos.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en este tema.");
+            const idsPreguntas = fallos.map(f => f.pregunta_id);
+            const { data, error } = await sb.from('preguntas').select('*').in('id', idsPreguntas);
+            if (error) throw error;
+            rawData = data;
+        } else {
+            const { data, error } = await sb.from('preguntas').select('*').in('test_id', idsTests);
+            if (error) throw error;
+            rawData = data;
+        }
 
-            if (!rawData || rawData.length === 0) return alert("No se encontraron preguntas.");
-            rawData.sort(() => Math.random() - 0.5);
-            const preguntasFinales = rawData.slice(0, limite);
+        if (!rawData || rawData.length === 0) return alert("No se encontraron preguntas.");
+        rawData.sort(() => Math.random() - 0.5);
+        const preguntasFinales = rawData.slice(0, limite);
 
-            app.resetState();
-            state.q = preguntasFinales;
-            const icono = modo === 'fallos' ? '⚠️' : '📚';
-            const etiqueta = modo === 'fallos' ? 'REPASO FALLOS' : 'TEST TEMA';
-            state.currentTestName = `${icono} ${etiqueta}: ${nombreTema} (${state.q.length})`;
-            state.currentTestId = null; 
-            
-            state.mode = document.querySelector('input[name="modo"]:checked').value; //NUEVO***************** MANTER EL MODO ELEGIDO (ESTUDIO / EXAMEN)
+        app.resetState();
+        state.q = preguntasFinales;
+        const icono = modo === 'fallos' ? '⚠️' : '📚';
+        const etiqueta = modo === 'fallos' ? 'REPASO FALLOS' : 'TEST TEMA';
+        state.currentTestName = `${icono} ${etiqueta}: ${nombreTema} (${state.q.length})`;
+        state.currentTestId = null;
+        state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-            app.switchView('view-test');
-            document.getElementById('modal-temas').classList.add('hidden');
-            document.getElementById('btn-salir').classList.remove('hidden');
-            app.startTimer();
-            app.render();
-        } catch (err) { console.error(err); alert("Error al cargar el tema."); }
-    },
+        // --- NUEVO: Crear intento para el repaso ---
+        const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+            test_id: null,
+            nombre_repaso: state.currentTestName,
+            aciertos: 0,
+            fallos: 0,
+            arriesgadas: 0
+        }]).select().single();
+        if (!errorIntento && intento) state.currentIntentoId = intento.id;
+        // -------------------------------------------
+
+        app.switchView('view-test');
+        document.getElementById('modal-temas').classList.add('hidden');
+        document.getElementById('btn-salir').classList.remove('hidden');
+        app.startTimer();
+        app.render();
+    } catch (err) { console.error(err); alert("Error al cargar el tema."); }
+},
 
     prepararRepasoPorTestId: async (testId, nombreTest) => {
-        try {
-            const slider = document.getElementById('tema-range');
-            const limite = slider ? parseInt(slider.value, 10) : 110;
-            const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
-            const modo = modoRadio ? modoRadio.value : 'fallos';
+    try {
+        const slider = document.getElementById('tema-range');
+        const limite = slider ? parseInt(slider.value, 10) : 110;
+        const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
+        const modo = modoRadio ? modoRadio.value : 'fallos';
 
-            let rawData = [];
-            if (modo === 'fallos') {
-                const { data: fallos, error: errorFallos } = await sb.from('errores').select('pregunta_id').eq('test_id', testId);
-                if (errorFallos) throw errorFallos;
-                if (!fallos || fallos.length === 0) return alert("✅ ¡Genial! No tienes fallos en este test.");
-                const idsPreguntas = fallos.map(f => f.pregunta_id);
-                const { data, error } = await sb.from('preguntas').select('*').in('id', idsPreguntas);
-                if (error) throw error;
-                rawData = data;
-            } else {
-                const { data, error } = await sb.from('preguntas').select('*').eq('test_id', testId);
-                if (error) throw error;
-                rawData = data;
-            }
+        let rawData = [];
+        if (modo === 'fallos') {
+            const { data: fallos, error: errorFallos } = await sb.from('errores').select('pregunta_id').eq('test_id', testId);
+            if (errorFallos) throw errorFallos;
+            if (!fallos || fallos.length === 0) return alert("✅ ¡Genial! No tienes fallos en este test.");
+            const idsPreguntas = fallos.map(f => f.pregunta_id);
+            const { data, error } = await sb.from('preguntas').select('*').in('id', idsPreguntas);
+            if (error) throw error;
+            rawData = data;
+        } else {
+            const { data, error } = await sb.from('preguntas').select('*').eq('test_id', testId);
+            if (error) throw error;
+            rawData = data;
+        }
 
-            if (!rawData || rawData.length === 0) return alert("Este test está vacío.");
-            rawData.sort(() => Math.random() - 0.5);
-            const preguntasFinales = rawData.slice(0, limite);
+        if (!rawData || rawData.length === 0) return alert("Este test está vacío.");
+        rawData.sort(() => Math.random() - 0.5);
+        const preguntasFinales = rawData.slice(0, limite);
 
-            app.resetState();
-            state.q = preguntasFinales;
-            const icono = modo === 'fallos' ? '⚠️' : '📝';
-            const textoModo = modo === 'fallos' ? 'REPASO FALLOS: ' : ''; 
-            state.currentTestName = `${icono} ${textoModo}${nombreTest} (${state.q.length})`;
-            state.currentTestId = testId;
-            
-            state.mode = document.querySelector('input[name="modo"]:checked').value; //NUEVO***************** MANTER EL MODO ELEGIDO (ESTUDIO / EXAMEN)
+        app.resetState();
+        state.q = preguntasFinales;
+        const icono = modo === 'fallos' ? '⚠️' : '📝';
+        const textoModo = modo === 'fallos' ? 'REPASO FALLOS: ' : ''; 
+        state.currentTestName = `${icono} ${textoModo}${nombreTest} (${state.q.length})`;
+        state.currentTestId = testId;
+        state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-            app.switchView('view-test');
-            document.getElementById('modal-temas').classList.add('hidden');
-            document.getElementById('btn-salir').classList.remove('hidden');
-            app.startTimer();
-            app.render();
-        } catch (err) { console.error(err); alert("Error al cargar el test."); }
-    },
+        // --- NUEVO: Crear intento para el repaso ---
+        const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+            test_id: null,
+            nombre_repaso: state.currentTestName,
+            aciertos: 0,
+            fallos: 0,
+            arriesgadas: 0
+        }]).select().single();
+        if (!errorIntento && intento) state.currentIntentoId = intento.id;
+        // -------------------------------------------
+
+        app.switchView('view-test');
+        document.getElementById('modal-temas').classList.add('hidden');
+        document.getElementById('btn-salir').classList.remove('hidden');
+        app.startTimer();
+        app.render();
+    } catch (err) { console.error(err); alert("Error al cargar el test."); }
+},
     
     startRepasoTema: (nombre) => { app.prepararRepasoPorNombreTema(nombre); },
 
@@ -1019,7 +1083,6 @@ const app = {
         return;
     }
 
-    // --- Checkbox SELECCIONAR TODO ---
     const selectAllDiv = document.createElement('div');
     selectAllDiv.style = "margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #30363d;";
     selectAllDiv.innerHTML = `
@@ -1042,20 +1105,25 @@ const app = {
         const testsDelBloque = state.testsCache.filter(t => t.temas && t.temas.bloque_id === bloque.id);
         if (testsDelBloque.length === 0) return;
 
-        const esBloqueExamen = bloque.nombre.toUpperCase().includes("EXÁMENES") || 
-                               bloque.nombre.toUpperCase().includes("SIMULACRO") || 
+        const esBloqueExamen = bloque.nombre.toUpperCase().includes("EXÁMENES") ||
+                               bloque.nombre.toUpperCase().includes("SIMULACRO") ||
                                bloque.nombre.toUpperCase().includes("OFICIAL");
 
         let itemsParaMostrar = [];
         if (esBloqueExamen) {
             testsDelBloque.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true }));
             itemsParaMostrar = testsDelBloque.map(t => ({
-                label: t.nombre, valor: t.nombre, esTest: true, id: t.id
+                label: t.nombre,
+                valor: `test_id:${t.id}`,   // ← identificador inequívoco
+                esTest: true,
+                id: t.id
             }));
         } else {
             const temasUnicos = [...new Set(testsDelBloque.map(t => t.temas.nombre))].sort();
             itemsParaMostrar = temasUnicos.map(tema => ({
-                label: tema, valor: tema, esTest: false
+                label: tema,
+                valor: `tema:${tema}`,       // ← identificador inequívoco
+                esTest: false
             }));
         }
 
@@ -1066,8 +1134,8 @@ const app = {
         const itemsHtml = itemsParaMostrar.map(item => {
             const safeValor = item.valor.replace(/'/g, "\\'");
             const clickFunction = item.esTest
-                ? `app.prepararRepasoPorTestId(${item.id}, '${safeValor}')`
-                : `app.prepararRepasoPorNombreTema('${safeValor}')`;
+                ? `app.prepararRepasoPorTestId(${item.id}, '${item.label.replace(/'/g, "\\'")}')`
+                : `app.prepararRepasoPorNombreTema('${item.label.replace(/'/g, "\\'")}')`;
             return `
                 <div class="tema-row">
                     <span class="tema-label" onclick="${clickFunction}">
@@ -1132,90 +1200,137 @@ const app = {
 },
 
     startRepasoMultiTema: async () => {
-        try {
-            const checkboxes = document.querySelectorAll('.tema-chk:checked');
-            const seleccionados = Array.from(checkboxes).map(cb => cb.value);
-            if (seleccionados.length === 0) return alert("⚠️ Selecciona al menos un tema o test.");
+    try {
+        const checkboxes = document.querySelectorAll('.tema-chk:checked');
+        const seleccionados = Array.from(checkboxes).map(cb => cb.value);
+        if (seleccionados.length === 0) return alert("⚠️ Selecciona al menos un tema o test.");
 
-            document.getElementById('modal-temas').classList.add('hidden');
-            const slider = document.getElementById('tema-range');
-            const limite = slider ? parseInt(slider.value, 10) : 110; 
-            const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
-            const modo = modoRadio ? modoRadio.value : 'todo'; 
-            const mapTestIdToSeleccion = {};
-            
-            const testsCoincidentes = state.testsCache.filter(t => {
-                if (t.temas && seleccionados.includes(t.temas.nombre)) {
-                    mapTestIdToSeleccion[t.id] = t.temas.nombre; return true;
-                }
-                if (seleccionados.includes(t.nombre)) {
-                    mapTestIdToSeleccion[t.id] = t.nombre; return true;
-                }
-                return false;
+        document.getElementById('modal-temas').classList.add('hidden');
+        const slider = document.getElementById('tema-range');
+        const limite = slider ? parseInt(slider.value, 10) : 110;
+        const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
+        const modo = modoRadio ? modoRadio.value : 'todo';
+
+        // Separar seleccionados por tipo
+        const idsTestsDirectos = seleccionados
+            .filter(v => v.startsWith('test_id:'))
+            .map(v => parseInt(v.replace('test_id:', ''), 10));
+
+        const nombresTemasSeleccionados = seleccionados
+            .filter(v => v.startsWith('tema:'))
+            .map(v => v.replace('tema:', ''));
+
+        // Construir mapTestIdToSeleccion y lista de idsTests
+        const mapTestIdToSeleccion = {};
+
+        idsTestsDirectos.forEach(id => {
+            mapTestIdToSeleccion[id] = `test_id:${id}`;
+        });
+
+        state.testsCache
+            .filter(t => t.temas && nombresTemasSeleccionados.includes(t.temas.nombre))
+            .forEach(t => {
+                mapTestIdToSeleccion[t.id] = `tema:${t.temas.nombre}`;
             });
-            const idsTests = testsCoincidentes.map(t => t.id);
-            if (idsTests.length === 0) return alert("No se encontraron tests para la selección.");
 
-            let rawData = [];
-            if (modo === 'fallos') {
-                const { data: fallos, error } = await sb.from('errores').select('pregunta_id, test_id').in('test_id', idsTests);
+        const idsTests = Object.keys(mapTestIdToSeleccion).map(Number);
+        if (idsTests.length === 0) return alert("No se encontraron tests para la selección.");
+
+        // Obtener preguntas según modo
+        // DESPUÉS — queries en chunks de 5 tests para nunca superar el límite de 1000 filas
+        const CHUNK_SIZE = 5;
+        let rawData = [];
+
+        const chunks = [];
+        for (let i = 0; i < idsTests.length; i += CHUNK_SIZE) {
+            chunks.push(idsTests.slice(i, i + CHUNK_SIZE));
+        }
+
+        if (modo === 'fallos') {
+            for (const chunk of chunks) {
+                const { data: fallos, error } = await sb.from('errores')
+                    .select('pregunta_id, test_id')
+                    .in('test_id', chunk);
                 if (error) throw error;
-                if (!fallos || fallos.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en lo seleccionado.");
+                if (!fallos || fallos.length === 0) continue;
+
                 const idsPreguntas = fallos.map(f => f.pregunta_id);
-                const { data: preguntas, error: errP } = await sb.from('preguntas').select('*').in('id', idsPreguntas);
+                const { data: preguntas, error: errP } = await sb.from('preguntas')
+                    .select('*')
+                    .in('id', idsPreguntas);
                 if (errP) throw errP;
-                rawData = preguntas.map(p => p); 
-            } else {
-                const { data: preguntas, error } = await sb.from('preguntas').select('*').in('test_id', idsTests);
-                if (error) throw error;
-                rawData = preguntas;
+                rawData = rawData.concat(preguntas);
             }
+            if (rawData.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en lo seleccionado.");
+        } else {
+            for (const chunk of chunks) {
+                const { data: preguntas, error } = await sb.from('preguntas')
+                    .select('*')
+                    .in('test_id', chunk)
+                    .limit(1000);
+                if (error) throw error;
+                rawData = rawData.concat(preguntas || []);
+            }
+        }
 
-            if (!rawData || rawData.length === 0) return alert("No se encontraron preguntas disponibles.");
-            const bolsas = {};
-            seleccionados.forEach(sel => bolsas[sel] = []);
+        if (!rawData || rawData.length === 0) return alert("No se encontraron preguntas disponibles.");
 
-            rawData.forEach(p => {
-                const grupo = mapTestIdToSeleccion[p.test_id];
-                if (grupo && bolsas[grupo]) bolsas[grupo].push(p);
-            });
+        // Construir bolsas por clave de selección (round robin)
+        const bolsas = {};
+        seleccionados.forEach(sel => bolsas[sel] = []);
 
-            Object.values(bolsas).forEach(lista => lista.sort(() => Math.random() - 0.5));
-            const preguntasFinales = [];
-            let buscando = true;
+        rawData.forEach(p => {
+            const clave = mapTestIdToSeleccion[p.test_id];
+            if (clave && bolsas[clave]) bolsas[clave].push(p);
+        });
 
-            while (preguntasFinales.length < limite && buscando) {
-                buscando = false;
-                for (const key of seleccionados) {
-                    if (preguntasFinales.length >= limite) break;
-                    if (bolsas[key].length > 0) {
-                        preguntasFinales.push(bolsas[key].pop());
-                        buscando = true; 
-                    }
+        Object.values(bolsas).forEach(lista => lista.sort(() => Math.random() - 0.5));
+
+        // Round robin
+        const preguntasFinales = [];
+        let buscando = true;
+        while (preguntasFinales.length < limite && buscando) {
+            buscando = false;
+            for (const clave of seleccionados) {
+                if (preguntasFinales.length >= limite) break;
+                if (bolsas[clave] && bolsas[clave].length > 0) {
+                    preguntasFinales.push(bolsas[clave].pop());
+                    buscando = true;
                 }
             }
+        }
 
-            preguntasFinales.sort(() => Math.random() - 0.5);
-            const preguntasConInfo = preguntasFinales.map(p => {
-                const testOrigen = state.testsCache.find(t => t.id === p.test_id);
-                return { ...p, nombre_test: testOrigen ? testOrigen.nombre : 'Test Varios' };
-            });
+        preguntasFinales.sort(() => Math.random() - 0.5);
 
-            app.resetState();
-            state.q = preguntasConInfo;
-            const icono = modo === 'fallos' ? '⚠️' : '📚';
-            const textoModo = modo === 'fallos' ? ' REPASO FALLOS:' : ''; 
-            const nombreSeleccion = seleccionados.length === 1 ? seleccionados[0] : "MULTI-TEMA";
-            state.currentTestName = `${icono}${textoModo} ${nombreSeleccion} (${preguntasConInfo.length} PREGUNTAS)`;
-            state.mode = document.querySelector('input[name="modo"]:checked').value;
+        app.resetState();
+        state.q = preguntasFinales;
+        const icono = modo === 'fallos' ? '⚠️' : '📚';
+        const textoModo = modo === 'fallos' ? ' REPASO FALLOS:' : '';
+        const nombreSeleccion = seleccionados.length === 1
+            ? (seleccionados[0].startsWith('tema:') ? seleccionados[0].replace('tema:', '') : seleccionados[0].replace('test_id:', 'Test '))
+            : "MULTI-TEMA";
+        state.currentTestName = `${icono}${textoModo} ${nombreSeleccion} (${preguntasFinales.length} PREGUNTAS)`;
+        state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-            app.switchView('view-test');
-            document.getElementById('btn-salir').classList.remove('hidden');
-            app.startTimer();
-            app.render();
+        // Crear intento
+        const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+            test_id: null,
+            nombre_repaso: state.currentTestName,
+            aciertos: 0,
+            fallos: 0,
+            arriesgadas: 0
+        }]).select().single();
+        if (!errorIntento && intento) state.currentIntentoId = intento.id;
 
-        } catch (error) { console.error(error); alert("Error generando el test multi-selección."); }
-    }
+        app.switchView('view-test');
+        document.getElementById('btn-salir').classList.remove('hidden');
+        app.startTimer();
+        app.render();
+
+    } catch (error) { console.error(error); alert("Error generando el test multi-selección."); }
+}
+
+
 
 }; // FIN DEL OBJETO APP
 
