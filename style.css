@@ -27,6 +27,8 @@ html { scroll-behavior: smooth; }
 header { 
     padding: 20px; border-bottom: 1px solid #30363d; 
     display: flex; justify-content: space-between; align-items: center; 
+    flex-wrap: wrap; /* NUEVO: Permite que los elementos salten de línea si no caben */
+    gap: 20px; /* NUEVO: Añade separación vertical si hay salto de línea */
 }
 
 .menu-grid { 
@@ -130,6 +132,12 @@ header {
     #btn-accion, #btn-arriesgando { width: 100%; padding: 18px; }
     
     .stat-value { font-size: 2.2em; }
+
+    .stats-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
 }
 
 /* --- ESTILOS COMPLEMENTARIOS --- */
@@ -374,16 +382,16 @@ header {
 
 /* --- CRONÓMETRO CENTRADO --- */
 #timer {
-    position: absolute;       /* Lo liberamos del flujo normal */
-    left: 50%;                /* Lo movemos a la mitad de la pantalla */
-    transform: translateX(-50%); /* Corregimos su propio ancho para centrarlo exacto */
+    /* Eliminamos el position: absolute y sus transformaciones */
+    position: relative;       
+    margin: 0 auto; /* Lo mantiene centrado en el espacio disponible */
     
     font-variant-numeric: tabular-nums;
     font-family: "Courier New", Courier, monospace;
     font-weight: 800;
     color: var(--accent);
-    font-size: 3em;         /* Un poco más grande para que se vea bien */
-    background: rgba(13, 17, 23, 0.8); /* Fondo semi-transparente por si se solapa */
+    font-size: 3em;         
+    background: rgba(13, 17, 23, 0.8); 
     padding: 5px 15px;
     border-radius: 20px;
     border: 1px solid #30363d;
