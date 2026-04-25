@@ -729,10 +729,11 @@ const app = {
                         <span style="color: var(--red);">❌ ${h.fallos}</span>
                         <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
                     </div>
-                </div>
-                <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
+                    <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
                     🔁 REPETIR ESTE TEST
-                </button>
+                    </button>
+                </div>
+                
             </div>
             <div id="revision-list" style="margin-top: 30px;"></div>`;
 
