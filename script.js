@@ -294,18 +294,34 @@ const app = {
             const modo = modoRadio ? modoRadio.value : 'todo'; 
 
             let rawData = [];
-            if (modo === 'fallos') {
-                const { data: errores, error } = await sb.from('errores').select('pregunta_id, test_id').in('test_id', testsValidos);
-                if (error) throw error;
-                if (!errores || errores.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en tus tests completados.");
-                rawData = errores.map(e => ({ id: e.pregunta_id, test_id: e.test_id }));
-            } else {
-                const { data, error } = await sb.from('preguntas').select('id, test_id').in('test_id', testsValidos);
-                if (error) throw error;
-                rawData = data;
+            const CHUNK_SIZE = 5;
+            const chunks = [];
+            for (let i = 0; i < testsValidos.length; i += CHUNK_SIZE) {
+                chunks.push(testsValidos.slice(i, i + CHUNK_SIZE));
             }
 
-            if (!rawData || rawData.length === 0) return alert("Error: No se encontraron preguntas disponibles.");
+            if (modo === 'fallos') {
+                for (const chunk of chunks) {
+                    const { data: errores, error } = await sb.from('errores')
+                        .select('pregunta_id, test_id')
+                        .in('test_id', chunk)
+                        .limit(1000);
+                    if (error) throw error;
+                    rawData = rawData.concat(errores || []);
+                }
+                if (rawData.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en tus tests completados.");
+                rawData = rawData.map(e => ({ id: e.pregunta_id, test_id: e.test_id }));
+            } else {
+                for (const chunk of chunks) {
+                    const { data, error } = await sb.from('preguntas')
+                        .select('id, test_id')
+                        .in('test_id', chunk)
+                        .limit(1000);
+                    if (error) throw error;
+                    rawData = rawData.concat(data || []);
+                }
+                if (rawData.length === 0) return alert("Error: No se encontraron preguntas disponibles.");
+            }
 
             const bolsasPorTema = {};
             rawData.forEach(p => {
@@ -332,8 +348,22 @@ const app = {
             
             const icono = modo === 'fallos' ? '⚠️' : '🤖';
             state.currentTestName = `${icono} SIMULACRO (${ids.length} PREGUNTAS)`;
-        }
-        else { 
+
+            // Obtener preguntas completas a partir de los ids seleccionados por round robin
+            const idsChunks = [];
+            for (let i = 0; i < ids.length; i += 100) {
+                idsChunks.push(ids.slice(i, i + 100));
+            }
+            let preguntasCompletas = [];
+            for (const chunk of idsChunks) {
+                const { data: preguntas, error: errP } = await sb.from('preguntas').select('*').in('id', chunk);
+                if (errP) throw errP;
+                preguntasCompletas = preguntasCompletas.concat(preguntas || []);
+            }
+
+            state.q = preguntasCompletas.sort(() => Math.random() - 0.5);
+
+        } else { 
             let query = sb.from('errores').select('pregunta_id, veces_fallada, ultimo_fallo');
             if (tipo === 'critico') {
                 query = query.order('veces_fallada', { ascending: false }).limit(30);
@@ -354,15 +384,25 @@ const app = {
             
             ids = listaErrores.map(e => e.pregunta_id);
             if (tipo === 'express') ids = ids.sort(() => Math.random() - 0.5).slice(0, 20);
+
+            // Obtener preguntas completas con chunking
+            const idsChunks = [];
+            for (let i = 0; i < ids.length; i += 100) {
+                idsChunks.push(ids.slice(i, i + 100));
+            }
+            let preguntasCompletas = [];
+            for (const chunk of idsChunks) {
+                const { data: preguntas, error: errP } = await sb.from('preguntas').select('*').in('id', chunk);
+                if (errP) throw errP;
+                preguntasCompletas = preguntasCompletas.concat(preguntas || []);
+            }
+
+            state.q = preguntasCompletas.sort(() => Math.random() - 0.5);
         }
 
-        const { data: preguntas, error: errP } = await sb.from('preguntas').select('*').in('id', ids);
-        if (errP) throw errP;
-
-        state.q = preguntas.sort(() => Math.random() - 0.5);
         state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-        // --- NUEVO: Crear intento para el repaso ---
+        // Crear intento
         const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
             test_id: null,
             nombre_repaso: state.currentTestName,
@@ -371,7 +411,6 @@ const app = {
             arriesgadas: 0
         }]).select().single();
         if (!errorIntento && intento) state.currentIntentoId = intento.id;
-        // -------------------------------------------
 
         app.switchView('view-test');
         document.getElementById('btn-salir').classList.remove('hidden');
@@ -1220,7 +1259,7 @@ const app = {
             .filter(v => v.startsWith('tema:'))
             .map(v => v.replace('tema:', ''));
 
-        // Construir mapTestIdToSeleccion y lista de idsTests
+        // Construir mapTestIdToSeleccion
         const mapTestIdToSeleccion = {};
 
         idsTestsDirectos.forEach(id => {
@@ -1236,30 +1275,34 @@ const app = {
         const idsTests = Object.keys(mapTestIdToSeleccion).map(Number);
         if (idsTests.length === 0) return alert("No se encontraron tests para la selección.");
 
-        // Obtener preguntas según modo
-        // DESPUÉS — queries en chunks de 5 tests para nunca superar el límite de 1000 filas
+        // Queries en chunks para evitar el límite de 1000 filas de Supabase
         const CHUNK_SIZE = 5;
-        let rawData = [];
-
         const chunks = [];
         for (let i = 0; i < idsTests.length; i += CHUNK_SIZE) {
             chunks.push(idsTests.slice(i, i + CHUNK_SIZE));
         }
 
+        let rawData = [];
+
         if (modo === 'fallos') {
             for (const chunk of chunks) {
                 const { data: fallos, error } = await sb.from('errores')
                     .select('pregunta_id, test_id')
-                    .in('test_id', chunk);
+                    .in('test_id', chunk)
+                    .limit(1000);
                 if (error) throw error;
                 if (!fallos || fallos.length === 0) continue;
 
                 const idsPreguntas = fallos.map(f => f.pregunta_id);
-                const { data: preguntas, error: errP } = await sb.from('preguntas')
-                    .select('*')
-                    .in('id', idsPreguntas);
-                if (errP) throw errP;
-                rawData = rawData.concat(preguntas);
+                // Chunking también en la query de preguntas por ids
+                for (let i = 0; i < idsPreguntas.length; i += 100) {
+                    const idsChunk = idsPreguntas.slice(i, i + 100);
+                    const { data: preguntas, error: errP } = await sb.from('preguntas')
+                        .select('*')
+                        .in('id', idsChunk);
+                    if (errP) throw errP;
+                    rawData = rawData.concat(preguntas || []);
+                }
             }
             if (rawData.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en lo seleccionado.");
         } else {
