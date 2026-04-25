@@ -655,6 +655,7 @@ const app = {
         const datosFeedback = {
             q: state.q,
             ans: state.ans,
+            intentoId: state.currentIntentoId, // ← AÑADIR ESTO
             headerInfo: { porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, nombre: state.currentTestName }
         };
         sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
@@ -673,6 +674,9 @@ const app = {
                         <span style="color: #ff9800;">⚠️ ${arriesgadas}</span>
                     </div>
                     <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
+                    <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
+                        🔁 REPETIR ESTE TEST
+                    </button>
                 </div>
             </div>
             <div id="revision-list" style="margin-top: 30px;"></div>`;
@@ -726,6 +730,9 @@ const app = {
                         <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
                     </div>
                 </div>
+                <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
+                    🔁 REPETIR ESTE TEST
+                </button>
             </div>
             <div id="revision-list" style="margin-top: 30px;"></div>`;
 
@@ -1371,9 +1378,39 @@ const app = {
         app.render();
 
     } catch (error) { console.error(error); alert("Error generando el test multi-selección."); }
-}
+},
 
+repetirUltimoTest: async () => {
+    const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
+    if (error || !data) return alert("No hay ningún test guardado para repetir.");
 
+    const d = data.datos;
+    const h = d.headerInfo;
+
+    if (!d.q || d.q.length === 0) return alert("No hay preguntas guardadas para repetir.");
+
+    // Resetear el intento existente en lugar de crear uno nuevo
+    if (d.intentoId) {
+        await sb.from('intentos').update({
+            aciertos: 0,
+            fallos: 0,
+            arriesgadas: 0,
+            completado: false,
+            fecha: new Date().toISOString()
+        }).eq('id', d.intentoId);
+    }
+
+    app.resetState();
+    state.q = d.q.sort(() => Math.random() - 0.5);
+    state.currentTestName = `🔁 REPETICIÓN: ${h.nombre}`;
+    state.currentIntentoId = d.intentoId || null; // ← Reutiliza el intento existente
+    state.mode = document.querySelector('input[name="modo"]:checked').value;
+
+    app.switchView('view-test');
+    document.getElementById('btn-salir').classList.remove('hidden');
+    app.startTimer();
+    app.render();
+},
 
 }; // FIN DEL OBJETO APP
 
