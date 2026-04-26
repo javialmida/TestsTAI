@@ -124,7 +124,7 @@ const app = {
             state.currentIntentoId = datos.currentIntentoId;
 
             app.switchView('view-test');
-            document.getElementById('btn-salir').classList.remove('hidden');
+            app.setBtnSalir('salir');
             app.startTimer();
             app.render();
             alert(`☁️ Sesión en la nube recuperada:\n${state.currentTestName}\nPregunta ${state.cur + 1}`);
@@ -157,14 +157,6 @@ const app = {
                 sb.from('bloques').select('id, nombre'),
                 sb.from('intentos').select('test_id, completado')
             ]);
-
-            //DEBUG--------------------------------------------------------------------------------
-            console.log("Tests cargados:", testsRes.data?.map(t => ({
-                id: t.id,
-                nombre: t.nombre,
-                temas: t.temas
-            })));
-            //-------------------------------------------------------------------------------------
             
             if (testsRes.error) throw testsRes.error;
             const tests = testsRes.data;
@@ -413,7 +405,7 @@ const app = {
         if (!errorIntento && intento) state.currentIntentoId = intento.id;
 
         app.switchView('view-test');
-        document.getElementById('btn-salir').classList.remove('hidden');
+        app.setBtnSalir('salir');
         app.startTimer(); 
         app.render();
 
@@ -478,13 +470,7 @@ const app = {
             state.currentIntentoId = intento.id;
 
             app.switchView('view-test');
-            //document.getElementById('btn-salir').classList.remove('hidden');
-            //NUEVO----------------------------------------------------------
-            const btnSalir = document.getElementById('btn-salir');
-            btnSalir.classList.remove('hidden');
-            btnSalir.textContent = 'SALIR';
-            btnSalir.onclick = app.confirmarSalida;
-            //---------------------------------------------------------------
+            app.setBtnSalir('salir');
             app.startTimer();
             app.render();
         } catch (err) { alert(err.message); }
@@ -632,15 +618,8 @@ const app = {
         await app.borrarProgreso(); 
         
         app.switchView('view-results');
-        //document.getElementById('btn-salir').classList.add('hidden');
         //NUEVO----------------------------------------------------------
-        const btnSalir = document.getElementById('btn-salir');
-        btnSalir.classList.remove('hidden');
-        btnSalir.textContent = 'VOLVER';
-        btnSalir.onclick = () => {
-            app.switchView('view-menu');
-            btnSalir.classList.add('hidden');
-        };
+        app.setBtnSalir('volver');
         //----------------------------------------------------------------
         document.getElementById('counter').classList.add('hidden');
 
@@ -700,23 +679,15 @@ const app = {
         state.q = d.q;
         state.ans = d.ans;
         state.currentTestName = h.nombre;
-
-        //app.switchView('view-results');
-        //document.getElementById('btn-salir').classList.remove('hidden'); 
-        //document.getElementById('counter').classList.add('hidden');
-
-        //NUEVO-----------------------------------------------------------------------------
         app.switchView('view-results');
-        const btnSalir = document.getElementById('btn-salir');
-        btnSalir.classList.remove('hidden');
-        btnSalir.textContent = 'VOLVER';
-        btnSalir.onclick = () => {
-            app.switchView('view-menu');
-            btnSalir.classList.add('hidden');
-        };
+        // Si hay test activo, el botón debe seguir siendo SALIR para volver al test
+        // Si no hay test activo, ponemos VOLVER al menú
+        if (state.timerInterval && state.q.length > 0) {
+            app.setBtnSalir('salir');
+        } else {
+            app.setBtnSalir('volver');
+        }
         document.getElementById('counter').classList.add('hidden');
-        //----------------------------------------------------------------------------------
-
         document.getElementById('final-stats').innerHTML = `
             <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
                 <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
@@ -849,7 +820,10 @@ const app = {
             btnResume.style.color = "white";
             btnResume.style.border = "none";
             btnResume.style.marginRight = "5px";
-            btnResume.onclick = () => app.switchView('view-test');
+            btnResume.onclick = () => {
+                app.switchView('view-test');
+                app.setBtnSalir('salir'); // ← añadir esto
+            };
             
             // Insertamos antes del botón Volver (que es el último)
             headerBtnContainer.insertBefore(btnResume, headerBtnContainer.lastElementChild);
@@ -1056,7 +1030,7 @@ const app = {
 
         app.switchView('view-test');
         document.getElementById('modal-temas').classList.add('hidden');
-        document.getElementById('btn-salir').classList.remove('hidden');
+        app.setBtnSalir('salir');
         app.startTimer();
         app.render();
     } catch (err) { console.error(err); alert("Error al cargar el tema."); }
@@ -1109,7 +1083,7 @@ const app = {
 
         app.switchView('view-test');
         document.getElementById('modal-temas').classList.add('hidden');
-        document.getElementById('btn-salir').classList.remove('hidden');
+        app.setBtnSalir('salir');
         app.startTimer();
         app.render();
     } catch (err) { console.error(err); alert("Error al cargar el test."); }
@@ -1374,7 +1348,7 @@ const app = {
         if (!errorIntento && intento) state.currentIntentoId = intento.id;
 
         app.switchView('view-test');
-        document.getElementById('btn-salir').classList.remove('hidden');
+        app.setBtnSalir('salir');
         app.startTimer();
         app.render();
 
@@ -1408,10 +1382,25 @@ repetirUltimoTest: async () => {
     state.mode = document.querySelector('input[name="modo"]:checked').value;
 
     app.switchView('view-test');
-    document.getElementById('btn-salir').classList.remove('hidden');
+    app.setBtnSalir('salir');
     app.startTimer();
     app.render();
 },
+
+    setBtnSalir: (modo) => {
+        const btn = document.getElementById('btn-salir');
+        btn.classList.remove('hidden');
+        if (modo === 'salir') {
+            btn.textContent = 'SALIR';
+            btn.onclick = app.confirmarSalida;
+        } else {
+            btn.textContent = 'VOLVER';
+            btn.onclick = () => {
+                app.switchView('view-menu');
+                btn.classList.add('hidden');
+            };
+        }
+    },
 
 }; // FIN DEL OBJETO APP
 
