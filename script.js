@@ -518,8 +518,20 @@ const app = {
             }
         }
 
-        document.getElementById('q-enunciado').innerHTML = `${headerHtml}${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
-        
+        document.getElementById('q-enunciado').innerHTML = `
+            ${headerHtml}
+            <span 
+                title="Copiar pregunta como JSON" 
+                style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;"
+                onclick='(() => {
+                    const row = ${JSON.stringify(item)};
+                    navigator.clipboard.writeText(JSON.stringify(row, null, 2))
+                        .then(() => { this.style.opacity="1"; setTimeout(() => this.style.opacity="0.4", 800); })
+                        .catch(() => alert("No se pudo copiar al portapapeles"));
+                })()'
+            >📋</span>
+            ${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
+
         const imgEl = document.getElementById('question-img');
         if (item.imagen_url) {
             imgEl.src = item.imagen_url;
@@ -636,7 +648,7 @@ const app = {
             ans: state.ans,
             headerInfo: { porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, nombre: state.currentTestName }
         };
-        
+
         sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
             if(error) console.error("Error guardando feedback:", error);
         });
