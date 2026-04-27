@@ -520,17 +520,22 @@ const app = {
 
         document.getElementById('q-enunciado').innerHTML = `
             ${headerHtml}
-            <span 
-                title="Copiar pregunta como JSON" 
-                style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;"
-                onclick='(() => {
-                    const row = ${JSON.stringify(item)};
-                    navigator.clipboard.writeText(JSON.stringify(row, null, 2))
-                        .then(() => { this.style.opacity="1"; setTimeout(() => this.style.opacity="0.4", 800); })
-                        .catch(() => alert("No se pudo copiar al portapapeles"));
-                })()'
-            >📋</span>
+            <span id="btn-copy-json" title="Copiar pregunta como JSON" 
+                style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;">
+                📋
+            </span>
             ${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
+
+        // Añadir el listener por separado, así el JSON nunca interfiere con el HTML
+        document.getElementById('btn-copy-json').addEventListener('click', () => {
+            navigator.clipboard.writeText(JSON.stringify(item, null, 2))
+                .then(() => {
+                    const btn = document.getElementById('btn-copy-json');
+                    btn.style.opacity = "1";
+                    setTimeout(() => btn.style.opacity = "0.4", 800);
+                })
+                .catch(() => alert("No se pudo copiar al portapapeles"));
+        });
 
         const imgEl = document.getElementById('question-img');
         if (item.imagen_url) {
