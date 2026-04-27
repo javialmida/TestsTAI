@@ -634,9 +634,9 @@ const app = {
         const datosFeedback = {
             q: state.q,
             ans: state.ans,
-            intentoId: state.currentIntentoId, // ← AÑADIR ESTO
             headerInfo: { porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, nombre: state.currentTestName }
         };
+        
         sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
             if(error) console.error("Error guardando feedback:", error);
         });
@@ -1364,22 +1364,20 @@ repetirUltimoTest: async () => {
 
     if (!d.q || d.q.length === 0) return alert("No hay preguntas guardadas para repetir.");
 
-    // Resetear el intento existente en lugar de crear uno nuevo
-    if (d.intentoId) {
-        await sb.from('intentos').update({
-            aciertos: 0,
-            fallos: 0,
-            arriesgadas: 0,
-            completado: false,
-            fecha: new Date().toISOString()
-        }).eq('id', d.intentoId);
-    }
-
     app.resetState();
     state.q = d.q.sort(() => Math.random() - 0.5);
     state.currentTestName = `🔁 REPETICIÓN: ${h.nombre}`;
-    state.currentIntentoId = d.intentoId || null; // ← Reutiliza el intento existente
     state.mode = document.querySelector('input[name="modo"]:checked').value;
+
+    // Crear intento nuevo en lugar de sobreescribir el anterior
+    const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+        test_id: null,
+        nombre_repaso: state.currentTestName,
+        aciertos: 0,
+        fallos: 0,
+        arriesgadas: 0
+    }]).select().single();
+    if (!errorIntento && intento) state.currentIntentoId = intento.id;
 
     app.switchView('view-test');
     app.setBtnSalir('salir');
