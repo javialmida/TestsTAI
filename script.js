@@ -671,10 +671,10 @@ const app = {
                     </div>
                     <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
                     <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
-                    🔁 REPETIR ESTE TEST
+                    🔁 REPETIR TEST
                     </button>
                     <button onclick="app.repetirSoloFallos()" style="margin-top: 10px; background: var(--red); color: #fff; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
-                    ❌ REPETIR SOLO FALLOS
+                    ❌ REPETIR FALLOS
                     </button>
                 </div>
             </div>
@@ -721,10 +721,10 @@ const app = {
                         <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
                     </div>
                     <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
-                    🔁 REPETIR ESTE TEST
+                    🔁 REPETIR TEST
                     </button>
                     <button onclick="app.repetirSoloFallos()" style="margin-top: 10px; background: var(--red); color: #fff; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
-                    ❌ REPETIR SOLO FALLOS
+                    ❌ REPETIR FALLOS
                     </button>
                 </div>
                 
