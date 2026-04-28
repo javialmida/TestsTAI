@@ -671,7 +671,10 @@ const app = {
                     </div>
                     <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
                     <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
-                        🔁 REPETIR ESTE TEST
+                    🔁 REPETIR ESTE TEST
+                    </button>
+                    <button onclick="app.repetirSoloFallos()" style="margin-top: 10px; background: var(--red); color: #fff; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
+                    ❌ REPETIR SOLO FALLOS
                     </button>
                 </div>
             </div>
@@ -719,6 +722,9 @@ const app = {
                     </div>
                     <button onclick="app.repetirUltimoTest()" style="margin-top: 20px; background: var(--green); color: #000; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
                     🔁 REPETIR ESTE TEST
+                    </button>
+                    <button onclick="app.repetirSoloFallos()" style="margin-top: 10px; background: var(--red); color: #fff; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; letter-spacing: 1px;">
+                    ❌ REPETIR SOLO FALLOS
                     </button>
                 </div>
                 
@@ -1415,6 +1421,43 @@ repetirUltimoTest: async () => {
                 btn.classList.add('hidden');
             };
         }
+    },
+
+    repetirSoloFallos: async () => {
+        const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
+        if (error || !data) return alert("No hay ningún test guardado.");
+
+        const d = data.datos;
+        const h = d.headerInfo;
+
+        if (!d.q || d.q.length === 0) return alert("No hay preguntas guardadas.");
+
+        // Filtrar solo las preguntas falladas
+        const soloFallos = d.q.filter((p, i) => {
+            const res = d.ans[i];
+            return !res || res.letra !== p.correcta.toLowerCase();
+        });
+
+        if (soloFallos.length === 0) return alert("✅ ¡No fallaste ninguna pregunta en ese test!");
+
+        app.resetState();
+        state.q = soloFallos.sort(() => Math.random() - 0.5);
+        state.currentTestName = `❌ SOLO FALLOS: ${h.nombre} (${soloFallos.length})`;
+        state.mode = document.querySelector('input[name="modo"]:checked').value;
+
+        const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+            test_id: null,
+            nombre_repaso: state.currentTestName,
+            aciertos: 0,
+            fallos: 0,
+            arriesgadas: 0
+        }]).select().single();
+        if (!errorIntento && intento) state.currentIntentoId = intento.id;
+
+        app.switchView('view-test');
+        app.setBtnSalir('salir');
+        app.startTimer();
+        app.render();
     },
 
 }; // FIN DEL OBJETO APP
