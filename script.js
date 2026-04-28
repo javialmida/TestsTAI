@@ -921,13 +921,27 @@ const app = {
         });
 
         // Calculamos globales basados en estos "últimos intentos"
-        const todosLosPorcentajes = Object.values(statsMap).flatMap(b => b.porcentajesTests);
-        const porcentajeGlobal = (todosLosPorcentajes.reduce((a, b) => a + b, 0) / todosLosPorcentajes.length).toFixed(1);
+        //const todosLosPorcentajes = Object.values(statsMap).flatMap(b => b.porcentajesTests);
+        //const porcentajeGlobal = (todosLosPorcentajes.reduce((a, b) => a + b, 0) / todosLosPorcentajes.length).toFixed(1);
         
         // Para el total de preguntas contestadas históricamente, sí usamos todosLosIntentos original
         // (o puedes usar solo los últimos si prefieres "preguntas en intentos vigentes", 
         // pero normalmente "Total Preguntas" es histórico. Lo dejo histórico aquí:)
-        const totalRespondidasGlobal = todosLosIntentos.reduce((a, c) => a + (c.aciertos + c.fallos), 0);
+        //const totalRespondidasGlobal = todosLosIntentos.reduce((a, c) => a + (c.aciertos + c.fallos), 0);
+
+        //NUEVO CÁLCULO DE ESTADÍSTICAS GLOBALES, INCLUYE INTENTOS DE TESTS GENERADOS (LAS ESTADÍSTICAS DE TESTS POR TEMA SIGUE IGUAL)
+        //ARRIBA SIGO CONSERVANDO EL CÁLCULO ANTIGUO, POR SI QUEREMOS RECUPERARLO UN DÍA.
+        let totalAciertosGlobal = 0;
+        let totalFallosGlobal = 0;
+        todosLosIntentos.forEach(i => {
+            totalAciertosGlobal += i.aciertos;
+            totalFallosGlobal += i.fallos;
+        });
+        const totalRespondidas = totalAciertosGlobal + totalFallosGlobal;
+        const porcentajeGlobal = totalRespondidas > 0
+            ? ((totalAciertosGlobal / totalRespondidas) * 100).toFixed(1)
+            : "0.0";
+        const totalRespondidasGlobal = totalRespondidas;
         
         document.getElementById('stat-total-preguntas').innerText = totalRespondidasGlobal;
         document.getElementById('stat-acierto-global').innerText = `${porcentajeGlobal}%`;
