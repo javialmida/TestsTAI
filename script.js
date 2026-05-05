@@ -632,9 +632,9 @@ const app = {
 
     finalizar: async () => {
         app.stopTimer(); 
-        state.seconds = 0;
-        document.getElementById('timer').innerText = app.formatTime(0);
-        document.getElementById('timer').classList.add('hidden');
+        //state.seconds = 0;
+        //document.getElementById('timer').innerText = app.formatTime(0);
+        //document.getElementById('timer').classList.add('hidden');
         await app.borrarProgreso(); 
         
         app.switchView('view-results');
