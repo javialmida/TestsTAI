@@ -315,6 +315,14 @@ const app = {
                 if (rawData.length === 0) return alert("Error: No se encontraron preguntas disponibles.");
             }
 
+            // Deduplicar por id
+            const idsVistos = new Set();
+            rawData = rawData.filter(p => {
+                if (idsVistos.has(p.id)) return false;
+                idsVistos.add(p.id);
+                return true;
+            });
+
             const bolsasPorTema = {};
             rawData.forEach(p => {
                 if (!bolsasPorTema[p.test_id]) bolsasPorTema[p.test_id] = [];
@@ -323,17 +331,26 @@ const app = {
 
             Object.values(bolsasPorTema).forEach(lista => lista.sort(() => Math.random() - 0.5));
 
-            ids = [];
             const keys = Object.keys(bolsasPorTema);
-            let buscando = true;
+            ids = [];
 
+            // FASE 1: Una pregunta garantizada de cada test
+            for (const key of keys) {
+                if (ids.length >= limitePreguntas) break;
+                if (bolsasPorTema[key].length > 0) {
+                    ids.push(bolsasPorTema[key].pop());
+                }
+            }
+
+            // FASE 2: Rellenar con round robin
+            let buscando = true;
             while (ids.length < limitePreguntas && buscando) {
-                buscando = false; 
+                buscando = false;
                 for (const key of keys) {
-                    if (ids.length >= limitePreguntas) break; 
+                    if (ids.length >= limitePreguntas) break;
                     if (bolsasPorTema[key].length > 0) {
-                        ids.push(bolsasPorTema[key].pop()); 
-                        buscando = true; 
+                        ids.push(bolsasPorTema[key].pop());
+                        buscando = true;
                     }
                 }
             }
@@ -341,7 +358,6 @@ const app = {
             const icono = modo === 'fallos' ? '⚠️' : '🤖';
             state.currentTestName = `${icono} SIMULACRO (${ids.length} PREGUNTAS)`;
 
-            // Obtener preguntas completas a partir de los ids seleccionados por round robin
             const idsChunks = [];
             for (let i = 0; i < ids.length; i += 100) {
                 idsChunks.push(ids.slice(i, i + 100));
@@ -374,10 +390,9 @@ const app = {
             if (errErr) throw errErr;
             if (!listaErrores || listaErrores.length === 0) return alert("¡Sin fallos registrados para este modo!");
             
-            ids = listaErrores.map(e => e.pregunta_id);
+            ids = [...new Set(listaErrores.map(e => e.pregunta_id))];
             if (tipo === 'express') ids = ids.sort(() => Math.random() - 0.5).slice(0, 20);
 
-            // Obtener preguntas completas con chunking
             const idsChunks = [];
             for (let i = 0; i < ids.length; i += 100) {
                 idsChunks.push(ids.slice(i, i + 100));
@@ -394,7 +409,6 @@ const app = {
 
         state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-        // Crear intento
         const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
             test_id: null,
             nombre_repaso: state.currentTestName,
@@ -1035,7 +1049,7 @@ const app = {
             const { data: fallos, error: errorFallos } = await sb.from('errores').select('pregunta_id').in('test_id', idsTests);
             if (errorFallos) throw errorFallos;
             if (!fallos || fallos.length === 0) return alert("✅ ¡Genial! No tienes fallos registrados en este tema.");
-            const idsPreguntas = fallos.map(f => f.pregunta_id);
+            const idsPreguntas = [...new Set(fallos.map(f => f.pregunta_id))];
             const { data, error } = await sb.from('preguntas').select('*').in('id', idsPreguntas);
             if (error) throw error;
             rawData = data;
@@ -1046,8 +1060,49 @@ const app = {
         }
 
         if (!rawData || rawData.length === 0) return alert("No se encontraron preguntas.");
-        rawData.sort(() => Math.random() - 0.5);
-        const preguntasFinales = rawData.slice(0, limite);
+
+        // Deduplicar por enunciado
+        const enunciadosVistos = new Set();
+        rawData = rawData.filter(p => {
+            const clave = p.enunciado.trim().toLowerCase();
+            if (enunciadosVistos.has(clave)) return false;
+            enunciadosVistos.add(clave);
+            return true;
+        });
+
+        // Bolsas por test para fase garantizada
+        const bolsasPorTest = {};
+        rawData.forEach(p => {
+            if (!bolsasPorTest[p.test_id]) bolsasPorTest[p.test_id] = [];
+            bolsasPorTest[p.test_id].push(p);
+        });
+        Object.values(bolsasPorTest).forEach(lista => lista.sort(() => Math.random() - 0.5));
+
+        const keys = Object.keys(bolsasPorTest);
+        const preguntasFinales = [];
+
+        // FASE 1: Una pregunta garantizada de cada test del tema
+        for (const key of keys) {
+            if (preguntasFinales.length >= limite) break;
+            if (bolsasPorTest[key].length > 0) {
+                preguntasFinales.push(bolsasPorTest[key].pop());
+            }
+        }
+
+        // FASE 2: Rellenar con round robin
+        let buscando = true;
+        while (preguntasFinales.length < limite && buscando) {
+            buscando = false;
+            for (const key of keys) {
+                if (preguntasFinales.length >= limite) break;
+                if (bolsasPorTest[key].length > 0) {
+                    preguntasFinales.push(bolsasPorTest[key].pop());
+                    buscando = true;
+                }
+            }
+        }
+
+        preguntasFinales.sort(() => Math.random() - 0.5);
 
         app.resetState();
         state.q = preguntasFinales;
@@ -1057,7 +1112,6 @@ const app = {
         state.currentTestId = null;
         state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-        // --- NUEVO: Crear intento para el repaso ---
         const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
             test_id: null,
             nombre_repaso: state.currentTestName,
@@ -1066,7 +1120,6 @@ const app = {
             arriesgadas: 0
         }]).select().single();
         if (!errorIntento && intento) state.currentIntentoId = intento.id;
-        // -------------------------------------------
 
         app.switchView('view-test');
         document.getElementById('modal-temas').classList.add('hidden');
@@ -1272,7 +1325,6 @@ const app = {
         const modoRadio = document.querySelector('input[name="tema-modo"]:checked');
         const modo = modoRadio ? modoRadio.value : 'todo';
 
-        // Separar seleccionados por tipo
         const idsTestsDirectos = seleccionados
             .filter(v => v.startsWith('test_id:'))
             .map(v => parseInt(v.replace('test_id:', ''), 10));
@@ -1281,7 +1333,6 @@ const app = {
             .filter(v => v.startsWith('tema:'))
             .map(v => v.replace('tema:', ''));
 
-        // Construir mapTestIdToSeleccion
         const mapTestIdToSeleccion = {};
 
         idsTestsDirectos.forEach(id => {
@@ -1297,7 +1348,6 @@ const app = {
         const idsTests = Object.keys(mapTestIdToSeleccion).map(Number);
         if (idsTests.length === 0) return alert("No se encontraron tests para la selección.");
 
-        // Queries en chunks para evitar el límite de 1000 filas de Supabase
         const CHUNK_SIZE = 5;
         const chunks = [];
         for (let i = 0; i < idsTests.length; i += CHUNK_SIZE) {
@@ -1316,7 +1366,6 @@ const app = {
                 if (!fallos || fallos.length === 0) continue;
 
                 const idsPreguntas = fallos.map(f => f.pregunta_id);
-                // Chunking también en la query de preguntas por ids
                 for (let i = 0; i < idsPreguntas.length; i += 100) {
                     const idsChunk = idsPreguntas.slice(i, i + 100);
                     const { data: preguntas, error: errP } = await sb.from('preguntas')
@@ -1340,7 +1389,16 @@ const app = {
 
         if (!rawData || rawData.length === 0) return alert("No se encontraron preguntas disponibles.");
 
-        // Construir bolsas por clave de selección (round robin)
+        // Deduplicar por enunciado
+        const enunciadosVistos = new Set();
+        rawData = rawData.filter(p => {
+            const clave = p.enunciado.trim().toLowerCase();
+            if (enunciadosVistos.has(clave)) return false;
+            enunciadosVistos.add(clave);
+            return true;
+        });
+
+        // Construir bolsas por clave de selección
         const bolsas = {};
         seleccionados.forEach(sel => bolsas[sel] = []);
 
@@ -1351,8 +1409,17 @@ const app = {
 
         Object.values(bolsas).forEach(lista => lista.sort(() => Math.random() - 0.5));
 
-        // Round robin
         const preguntasFinales = [];
+
+        // FASE 1: Una pregunta garantizada de cada bolsa no vacía
+        for (const clave of seleccionados) {
+            if (preguntasFinales.length >= limite) break;
+            if (bolsas[clave] && bolsas[clave].length > 0) {
+                preguntasFinales.push(bolsas[clave].pop());
+            }
+        }
+
+        // FASE 2: Rellenar hasta el límite con round robin
         let buscando = true;
         while (preguntasFinales.length < limite && buscando) {
             buscando = false;
@@ -1377,7 +1444,6 @@ const app = {
         state.currentTestName = `${icono}${textoModo} ${nombreSeleccion} (${preguntasFinales.length} PREGUNTAS)`;
         state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-        // Crear intento
         const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
             test_id: null,
             nombre_repaso: state.currentTestName,
