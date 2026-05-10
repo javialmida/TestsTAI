@@ -665,6 +665,14 @@ const app = {
         state.arriesgando = !state.arriesgando;
         document.getElementById('btn-arriesgando').classList.toggle('active');
         if (state.ans[state.cur]) state.ans[state.cur].arriesgada = state.arriesgando;
+
+        // Si se activa ARRIESGANDO, desactivar PASAR
+        if (state.arriesgando && state.pasando) {
+            state.pasando = false;
+            document.getElementById('btn-pasar').classList.remove('active');
+            state.ans[state.cur] = null;
+            document.getElementById('btn-accion').disabled = true;
+        }
     },
 
     finalizar: async () => {
@@ -778,9 +786,8 @@ const app = {
         const enBlanco = res && res.enBlanco;
         const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
 
-        // Mostrar: fallos, arriesgadas acertadas, y en blanco
         if (esCorrecta && (!res || !res.arriesgada)) return '';
-        if (!res) return ''; // sin contestar (no debería ocurrir)
+        if (!res) return '';
 
         let borderColor, etiqueta;
         if (enBlanco) {
@@ -805,10 +812,17 @@ const app = {
         const numPregunta = p.numero_orden || (i + 1);
         const uCol = enBlanco ? '#aaaaaa' : (esCorrecta ? '#ff9800' : 'var(--red)');
 
+        // ID único para el botón de copiar de esta pregunta
+        const copyBtnId = `btn-copy-${i}`;
+
         return `
             <div class="rev-item" style="border-left: 5px solid ${borderColor}; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.03); text-align: left; border-radius: 4px;">
-                <div style="font-weight: bold; margin-bottom: 8px; color: ${borderColor}">
-                    ${etiqueta}
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: bold; color: ${borderColor}">${etiqueta}</div>
+                    <span id="${copyBtnId}" title="Copiar pregunta como JSON" 
+                        style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; margin-left:10px;">
+                        📋
+                    </span>
                 </div>
                 <div style="font-size: 0.85em; color: var(--text); opacity: 0.9; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">
                     ${nombreTest}
@@ -834,6 +848,27 @@ const app = {
     }).join('');
     
     container.innerHTML = "<h3 style='margin-top:40px; border-bottom: 1px solid #30363d; padding-bottom:10px;'>Revisión de Errores y Dudas</h3>" + (html || '<p style="color:var(--green)">¡Examen perfecto!</p>');
+
+    // Añadir listeners a los botones de copiar JSON después de renderizar
+    state.q.forEach((p, i) => {
+        const res = state.ans[i];
+        const enBlanco = res && res.enBlanco;
+        const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
+        if (esCorrecta && (!res || !res.arriesgada)) return;
+        if (!res) return;
+
+        const btn = document.getElementById(`btn-copy-${i}`);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(JSON.stringify(p, null, 2))
+                    .then(() => {
+                        btn.style.opacity = "1";
+                        setTimeout(() => btn.style.opacity = "0.4", 800);
+                    })
+                    .catch(() => alert("No se pudo copiar al portapapeles"));
+            });
+        }
+    });
 },
 
     switchView: (id) => {
