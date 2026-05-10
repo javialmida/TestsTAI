@@ -692,6 +692,8 @@ const app = {
     const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
     const fallos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra !== state.q[i].correcta.toLowerCase()).length;
     const enBlanco = state.ans.filter(a => a && a.enBlanco).length;
+    const arriesgadasAcertadas = state.ans.filter((a, i) => a && a.arriesgada && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
+    const pctArriesgadasAcertadas = arriesgadas > 0 ? ((arriesgadasAcertadas / arriesgadas) * 100).toFixed(0) : 0;
     const porcentaje = ((aciertos / total) * 100).toFixed(1);
 
     const notaSobre10 = state.mode === 'examen'
@@ -702,7 +704,11 @@ const app = {
         q: state.q,
         ans: state.ans,
         mode: state.mode,
-        headerInfo: { porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, enBlanco, notaSobre10, nombre: state.currentTestName }
+        headerInfo: { 
+            porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, 
+            arriesgadasAcertadas, pctArriesgadasAcertadas,
+            enBlanco, notaSobre10, nombre: state.currentTestName 
+        }
     };
     sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
         if(error) console.error("Error guardando feedback:", error);
@@ -722,6 +728,10 @@ const app = {
                     <span style="color: #ff9800;">⚠️ ${arriesgadas}</span>
                     <span style="color: #aaaaaa;">⬜ ${enBlanco}</span>
                 </div>
+                ${arriesgadas > 0 ? `
+                <div style="margin-top: 12px; font-size: 0.85em; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                    De <strong style="color:#ff9800">${arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${arriesgadasAcertadas}</strong> → <strong style="color:#ff9800">${pctArriesgadasAcertadas}%</strong> de acierto en dudas
+                </div>` : ''}
                 <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
                 <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
                 <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
@@ -739,43 +749,47 @@ const app = {
 },
 
     verUltimoFeedback: async () => {
-    const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
-    if (error || !data) return alert("No hay feedback guardado reciente.");
+        const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
+        if (error || !data) return alert("No hay feedback guardado reciente.");
 
-    const d = data.datos;
-    const h = d.headerInfo;
+        const d = data.datos;
+        const h = d.headerInfo;
 
-    state.q = d.q;
-    state.ans = d.ans;
-    state.currentTestName = h.nombre;
-    state.mode = d.mode || 'estudio';
+        state.q = d.q;
+        state.ans = d.ans;
+        state.currentTestName = h.nombre;
+        state.mode = d.mode || 'estudio';
 
-    app.switchView('view-results');
-    app.setBtnSalir('volver');
-    document.getElementById('counter').classList.add('hidden');
+        app.switchView('view-results');
+        app.setBtnSalir('volver');
+        document.getElementById('counter').classList.add('hidden');
 
-    document.getElementById('final-stats').innerHTML = `
-        <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
-            <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
-                <h3 style="margin: 0 0 10px 0; color: #a5d6ff; font-size: 0.9em; letter-spacing: 2px;">↺ RECUPERADO</h3>
-                <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${h.nombre}</div>
-                <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${h.porcentaje}%</div>
-                ${h.notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${h.notaSobre10}/10</div>` : ''}
-                <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px;">⏱️ Tiempo original: ${h.tiempoTotal}</div>
-                <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
-                    <span style="color: var(--green);">✅ ${h.aciertos}</span>
-                    <span style="color: var(--red);">❌ ${h.fallos}</span>
-                    <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
-                    <span style="color: #aaaaaa;">⬜ ${h.enBlanco || 0}</span>
+        document.getElementById('final-stats').innerHTML = `
+            <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+                <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
+                    <h3 style="margin: 0 0 10px 0; color: #a5d6ff; font-size: 0.9em; letter-spacing: 2px;">↺ RECUPERADO</h3>
+                    <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${h.nombre}</div>
+                    <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${h.porcentaje}%</div>
+                    ${h.notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${h.notaSobre10}/10</div>` : ''}
+                    <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px;">⏱️ Tiempo original: ${h.tiempoTotal}</div>
+                    <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
+                        <span style="color: var(--green);">✅ ${h.aciertos}</span>
+                        <span style="color: var(--red);">❌ ${h.fallos}</span>
+                        <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
+                        <span style="color: #aaaaaa;">⬜ ${h.enBlanco || 0}</span>
+                    </div>
+                    ${h.arriesgadas > 0 ? `
+                    <div style="margin-top: 12px; font-size: 0.85em; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                        De <strong style="color:#ff9800">${h.arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${h.arriesgadasAcertadas || 0}</strong> → <strong style="color:#ff9800">${h.pctArriesgadasAcertadas || 0}%</strong> de acierto en dudas
+                    </div>` : ''}
+                    <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
+                    <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
                 </div>
-                <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
-                <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
             </div>
-        </div>
-        <div id="revision-list" style="margin-top: 30px;"></div>`;
+            <div id="revision-list" style="margin-top: 30px;"></div>`;
 
-    app.renderRevision();
-},
+        app.renderRevision();
+    },
 
     renderRevision: () => {
     const container = document.getElementById('revision-list');
