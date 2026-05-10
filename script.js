@@ -710,9 +710,19 @@ const app = {
             enBlanco, notaSobre10, nombre: state.currentTestName 
         }
     };
-    sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
-        if(error) console.error("Error guardando feedback:", error);
-    });
+
+    // Insertar nuevo feedback
+    await sb.from('ultimo_feedback').insert({ datos: datosFeedback });
+
+    // Mantener solo los últimos 3, borrar los más antiguos
+    const { data: todos } = await sb.from('ultimo_feedback')
+        .select('id')
+        .order('id', { ascending: false });
+    
+    if (todos && todos.length > 3) {
+        const idsABorrar = todos.slice(3).map(r => r.id);
+        await sb.from('ultimo_feedback').delete().in('id', idsABorrar);
+    }
 
     document.getElementById('final-stats').innerHTML = `
         <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
@@ -749,47 +759,64 @@ const app = {
 },
 
     verUltimoFeedback: async () => {
-        const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
-        if (error || !data) return alert("No hay feedback guardado reciente.");
+    const { data, error } = await sb.from('ultimo_feedback')
+        .select('id, datos')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single();
 
-        const d = data.datos;
-        const h = d.headerInfo;
+    if (error || !data) return alert("No hay feedback guardado reciente.");
 
-        state.q = d.q;
-        state.ans = d.ans;
-        state.currentTestName = h.nombre;
-        state.mode = d.mode || 'estudio';
+    const d = data.datos;
+    const h = d.headerInfo;
+    const feedbackId = data.id;
 
-        app.switchView('view-results');
-        app.setBtnSalir('volver');
-        document.getElementById('counter').classList.add('hidden');
+    // Comprobar si hay más feedbacks guardados (para mostrar u ocultar el botón borrar)
+    const { data: todos } = await sb.from('ultimo_feedback').select('id').order('id', { ascending: false });
+    const hayMas = todos && todos.length > 1;
 
-        document.getElementById('final-stats').innerHTML = `
-            <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
-                <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
-                    <h3 style="margin: 0 0 10px 0; color: #a5d6ff; font-size: 0.9em; letter-spacing: 2px;">↺ RECUPERADO</h3>
-                    <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${h.nombre}</div>
-                    <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${h.porcentaje}%</div>
-                    ${h.notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${h.notaSobre10}/10</div>` : ''}
-                    <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px;">⏱️ Tiempo original: ${h.tiempoTotal}</div>
-                    <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
-                        <span style="color: var(--green);">✅ ${h.aciertos}</span>
-                        <span style="color: var(--red);">❌ ${h.fallos}</span>
-                        <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
-                        <span style="color: #aaaaaa;">⬜ ${h.enBlanco || 0}</span>
-                    </div>
-                    ${h.arriesgadas > 0 ? `
-                    <div style="margin-top: 12px; font-size: 0.85em; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
-                        De <strong style="color:#ff9800">${h.arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${h.arriesgadasAcertadas || 0}</strong> → <strong style="color:#ff9800">${h.pctArriesgadasAcertadas || 0}%</strong> de acierto en dudas
-                    </div>` : ''}
-                    <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
-                    <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
+    state.q = d.q;
+    state.ans = d.ans;
+    state.currentTestName = h.nombre;
+    state.mode = d.mode || 'estudio';
+
+    app.switchView('view-results');
+    app.setBtnSalir('volver');
+    document.getElementById('counter').classList.add('hidden');
+
+    document.getElementById('final-stats').innerHTML = `
+        <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+            <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
+                <h3 style="margin: 0 0 10px 0; color: #a5d6ff; font-size: 0.9em; letter-spacing: 2px;">↺ RECUPERADO</h3>
+                <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${h.nombre}</div>
+                <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${h.porcentaje}%</div>
+                ${h.notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${h.notaSobre10}/10</div>` : ''}
+                <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px;">⏱️ Tiempo original: ${h.tiempoTotal}</div>
+                <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
+                    <span style="color: var(--green);">✅ ${h.aciertos}</span>
+                    <span style="color: var(--red);">❌ ${h.fallos}</span>
+                    <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
+                    <span style="color: #aaaaaa;">⬜ ${h.enBlanco || 0}</span>
                 </div>
+                ${h.arriesgadas > 0 ? `
+                <div style="margin-top: 12px; font-size: 0.85em; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                    De <strong style="color:#ff9800">${h.arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${h.arriesgadasAcertadas || 0}</strong> → <strong style="color:#ff9800">${h.pctArriesgadasAcertadas || 0}%</strong> de acierto en dudas
+                </div>` : ''}
+                ${hayMas ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button onclick="app.borrarUltimoFeedback(${feedbackId})" 
+                        style="background: transparent; border: 1px solid var(--red); color: var(--red); padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold;">
+                        🗑️ BORRAR ESTE Y VER EL ANTERIOR
+                    </button>
+                </div>` : ''}
+                <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
+                <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
             </div>
-            <div id="revision-list" style="margin-top: 30px;"></div>`;
+        </div>
+        <div id="revision-list" style="margin-top: 30px;"></div>`;
 
-        app.renderRevision();
-    },
+    app.renderRevision();
+},
 
     renderRevision: () => {
     const container = document.getElementById('revision-list');
@@ -1545,7 +1572,12 @@ const app = {
 },
 
 repetirUltimoTest: async () => {
-    const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
+    const { data, error } = await sb.from('ultimo_feedback')
+        .select('datos')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single();
+
     if (error || !data) return alert("No hay ningún test guardado para repetir.");
 
     const d = data.datos;
@@ -1558,7 +1590,6 @@ repetirUltimoTest: async () => {
     state.currentTestName = `🔁 REPETICIÓN: ${h.nombre}`;
     state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-    // Crear intento nuevo en lugar de sobreescribir el anterior
     const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
         test_id: null,
         nombre_repaso: state.currentTestName,
@@ -1590,41 +1621,45 @@ repetirUltimoTest: async () => {
     },
 
     repetirSoloFallos: async () => {
-        const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
-        if (error || !data) return alert("No hay ningún test guardado.");
+    const { data, error } = await sb.from('ultimo_feedback')
+        .select('datos')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single();
 
-        const d = data.datos;
-        const h = d.headerInfo;
+    if (error || !data) return alert("No hay ningún test guardado.");
 
-        if (!d.q || d.q.length === 0) return alert("No hay preguntas guardadas.");
+    const d = data.datos;
+    const h = d.headerInfo;
 
-        // Filtrar solo las preguntas falladas
-        const soloFallos = d.q.filter((p, i) => {
-            const res = d.ans[i];
-            return !res || res.letra !== p.correcta.toLowerCase();
-        });
+    if (!d.q || d.q.length === 0) return alert("No hay preguntas guardadas.");
 
-        if (soloFallos.length === 0) return alert("✅ ¡No fallaste ninguna pregunta en ese test!");
+    const soloFallos = d.q.filter((p, i) => {
+        const res = d.ans[i];
+        return !res || res.enBlanco || res.letra !== p.correcta.toLowerCase();
+    });
 
-        app.resetState();
-        state.q = soloFallos.sort(() => Math.random() - 0.5);
-        state.currentTestName = `❌ SOLO FALLOS: ${h.nombre} (${soloFallos.length})`;
-        state.mode = document.querySelector('input[name="modo"]:checked').value;
+    if (soloFallos.length === 0) return alert("✅ ¡No fallaste ninguna pregunta en ese test!");
 
-        const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
-            test_id: null,
-            nombre_repaso: state.currentTestName,
-            aciertos: 0,
-            fallos: 0,
-            arriesgadas: 0
-        }]).select().single();
-        if (!errorIntento && intento) state.currentIntentoId = intento.id;
+    app.resetState();
+    state.q = soloFallos.sort(() => Math.random() - 0.5);
+    state.currentTestName = `❌ SOLO FALLOS: ${h.nombre} (${soloFallos.length})`;
+    state.mode = document.querySelector('input[name="modo"]:checked').value;
 
-        app.switchView('view-test');
-        app.setBtnSalir('salir');
-        app.startTimer();
-        app.render();
-    },
+    const { data: intento, error: errorIntento } = await sb.from('intentos').insert([{
+        test_id: null,
+        nombre_repaso: state.currentTestName,
+        aciertos: 0,
+        fallos: 0,
+        arriesgadas: 0
+    }]).select().single();
+    if (!errorIntento && intento) state.currentIntentoId = intento.id;
+
+    app.switchView('view-test');
+    app.setBtnSalir('salir');
+    app.startTimer();
+    app.render();
+},
 
     togglePasar: () => {
         const btnPasar = document.getElementById('btn-pasar');
@@ -1650,6 +1685,16 @@ repetirUltimoTest: async () => {
             state.ans[state.cur] = null;
             btnAccion.disabled = true;
         }
+    },
+
+    borrarUltimoFeedback: async (feedbackId) => {
+        if (!confirm("¿Borrar este feedback y ver el anterior?")) return;
+        
+        const { error } = await sb.from('ultimo_feedback').delete().eq('id', feedbackId);
+        if (error) return alert("Error al borrar el feedback.");
+        
+        // Cargar el siguiente feedback automáticamente
+        await app.verUltimoFeedback();
     },
 
 }; // FIN DEL OBJETO APP
