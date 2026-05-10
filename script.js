@@ -669,7 +669,7 @@ const app = {
 
     finalizar: async () => {
     app.stopTimer();
-    const tiempoTotal = app.formatTime(state.seconds); // ← guardar ANTES de resetear
+    const tiempoTotal = app.formatTime(state.seconds);
     state.seconds = 0;
     document.getElementById('timer').innerText = app.formatTime(0);
     document.getElementById('timer').classList.add('hidden');
@@ -686,7 +686,6 @@ const app = {
     const enBlanco = state.ans.filter(a => a && a.enBlanco).length;
     const porcentaje = ((aciertos / total) * 100).toFixed(1);
 
-    // Nota sobre 10 con penalización (solo en modo examen)
     const notaSobre10 = state.mode === 'examen'
         ? Math.max(0, ((aciertos - fallos / 3) / total) * 10).toFixed(2)
         : null;
@@ -704,7 +703,8 @@ const app = {
     document.getElementById('final-stats').innerHTML = `
         <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
             <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-                <h2 style="margin: 0 0 15px 0;">DOMINIO FINAL</h2>
+                <h2 style="margin: 0 0 10px 0;">DOMINIO FINAL</h2>
+                <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${state.currentTestName}</div>
                 <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${porcentaje}%</div>
                 ${notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${notaSobre10}/10</div>` : ''}
                 <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px; color: #a5d6ff;">⏱️ Tiempo: ${tiempoTotal}</div>
@@ -731,49 +731,43 @@ const app = {
 },
 
     verUltimoFeedback: async () => {
-        const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
-        if (error || !data) return alert("No hay feedback guardado reciente.");
+    const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
+    if (error || !data) return alert("No hay feedback guardado reciente.");
 
-        const d = data.datos;
-        const h = d.headerInfo;
+    const d = data.datos;
+    const h = d.headerInfo;
 
-        state.q = d.q;
-        state.ans = d.ans;
-        state.currentTestName = h.nombre;
-        app.switchView('view-results');
-        // Si hay test activo, el botón debe seguir siendo SALIR para volver al test
-        // Si no hay test activo, ponemos VOLVER al menú
-        if (state.timerInterval && state.q.length > 0) {
-            app.setBtnSalir('salir');
-        } else {
-            app.setBtnSalir('volver');
-        }
-        document.getElementById('counter').classList.add('hidden');
-        document.getElementById('final-stats').innerHTML = `
-            <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
-                <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
-                    <h3 style="margin: 0 0 10px 0; color: #a5d6ff; font-size: 0.9em; letter-spacing: 2px;">↺ RECUPERADO</h3>
-                    <h2 style="margin: 0 0 15px 0;">${h.nombre}</h2>
-                    <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${h.porcentaje}%</div>
-                    <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px;">⏱️ Tiempo original: ${h.tiempoTotal}</div>
-                    <div style="display: flex; gap: 20px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <span style="color: var(--green);">✅ ${h.aciertos}</span>
-                        <span style="color: var(--red);">❌ ${h.fallos}</span>
-                        <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
-                    </div>
-                    <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">
-                        🔁 REPETIR TEST
-                    </button>
-                    <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">
-                        ❌ REPETIR FALLOS
-                    </button>
+    state.q = d.q;
+    state.ans = d.ans;
+    state.currentTestName = h.nombre;
+    state.mode = d.mode || 'estudio';
+
+    app.switchView('view-results');
+    app.setBtnSalir('volver');
+    document.getElementById('counter').classList.add('hidden');
+
+    document.getElementById('final-stats').innerHTML = `
+        <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+            <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border: 1px solid #a5d6ff; border-radius: 12px;">
+                <h3 style="margin: 0 0 10px 0; color: #a5d6ff; font-size: 0.9em; letter-spacing: 2px;">↺ RECUPERADO</h3>
+                <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${h.nombre}</div>
+                <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${h.porcentaje}%</div>
+                ${h.notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${h.notaSobre10}/10</div>` : ''}
+                <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px;">⏱️ Tiempo original: ${h.tiempoTotal}</div>
+                <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
+                    <span style="color: var(--green);">✅ ${h.aciertos}</span>
+                    <span style="color: var(--red);">❌ ${h.fallos}</span>
+                    <span style="color: #ff9800;">⚠️ ${h.arriesgadas}</span>
+                    <span style="color: #aaaaaa;">⬜ ${h.enBlanco || 0}</span>
                 </div>
-                
+                <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
+                <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
             </div>
-            <div id="revision-list" style="margin-top: 30px;"></div>`;
+        </div>
+        <div id="revision-list" style="margin-top: 30px;"></div>`;
 
-        app.renderRevision();
-    },
+    app.renderRevision();
+},
 
     renderRevision: () => {
     const container = document.getElementById('revision-list');
@@ -1647,6 +1641,12 @@ document.addEventListener('keydown', (e) => {
             if (buttons[index]) buttons[index].click();
         }
         if (key === 'r') app.toggleArriesgando();
+        if (key === 'p') {
+            const btnPasar = document.getElementById('btn-pasar');
+            if (btnPasar && !btnPasar.classList.contains('hidden')) {
+                app.togglePasar();
+            }
+        }
         if (e.code === 'Space') {
             e.preventDefault();
             const btnAccion = document.getElementById('btn-accion');
