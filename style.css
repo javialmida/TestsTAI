@@ -238,6 +238,21 @@ header {
 #btn-arriesgando { background: #21262d; color: #8b949e; border: 1px solid #30363d; padding: 12px 25px; border-radius: 10px; font-weight: 700; min-width: 140px; }
 #btn-arriesgando.active { background: #d29922; color: #000; border-color: #e3b341; }
 
+#btn-pasar { 
+    background: #21262d; 
+    color: #8b949e; 
+    border: 1px solid #30363d; 
+    padding: 12px 25px; 
+    border-radius: 10px; 
+    font-weight: 700; 
+    min-width: 140px; 
+}
+#btn-pasar.active { 
+    background: #444444; 
+    color: #ffffff; 
+    border-color: #aaaaaa; 
+}
+
 .segmented-control { position: relative; display: flex; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 2px; width: 240px; margin: 10px auto; }
 .segmented-control input { display: none; }
 .segmented-control label { flex: 1; text-align: center; padding: 8px; cursor: pointer; font-size: 12px; font-weight: 600; z-index: 2; color: var(--text); }
