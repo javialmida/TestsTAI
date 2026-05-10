@@ -1636,7 +1636,11 @@ repetirUltimoTest: async () => {
 
     const soloFallos = d.q.filter((p, i) => {
         const res = d.ans[i];
-        return !res || res.enBlanco || res.letra !== p.correcta.toLowerCase();
+        if (!res) return true;                          // sin contestar
+        if (res.enBlanco) return true;                  // no contestada
+        if (res.arriesgada) return true;                // dudada (acertada o no)
+        if (res.letra !== p.correcta.toLowerCase()) return true; // fallada
+        return false;
     });
 
     if (soloFallos.length === 0) return alert("✅ ¡No fallaste ninguna pregunta en ese test!");
