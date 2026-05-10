@@ -436,14 +436,18 @@ const app = {
         const backupBloques = state.bloquesCache;
 
         state = { 
-            q: [], cur: 0, ans: [], mode: 'estudio', status: 'waiting', arriesgando: false, 
+            q: [], cur: 0, ans: [], mode: 'estudio', status: 'waiting', 
+            arriesgando: false, pasando: false,
             currentTestId: null, currentTestName: "", currentIntentoId: null,
-            testsCache: backupTests, bloquesCache: backupBloques
+            testsCache: backupTests, bloquesCache: backupBloques,
+            timerInterval: null, seconds: 0
         };
 
         document.getElementById('q-feedback')?.classList.add('hidden');
         document.getElementById('counter')?.classList.add('hidden');
         document.getElementById('btn-arriesgando')?.classList.remove('active');
+        document.getElementById('btn-pasar')?.classList.remove('active');
+        document.getElementById('btn-pasar')?.classList.add('hidden');
         document.getElementById('btn-salir')?.classList.add('hidden');
     },
 
@@ -492,12 +496,13 @@ const app = {
 
     actualizarIntento: async () => {
         if (!state.currentIntentoId) return;
-        const aciertos = state.ans.filter((a, i) => a && a.letra === state.q[i].correcta.toLowerCase()).length;
+        const aciertos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
         const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
-        const fallos = state.ans.filter((a, i) => a && a.letra !== state.q[i].correcta.toLowerCase()).length;
+        const fallos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra !== state.q[i].correcta.toLowerCase()).length;
+        const enBlanco = state.ans.filter(a => a && a.enBlanco).length;
         
-        await sb.from('intentos').update({ aciertos, fallos, arriesgadas }).eq('id', state.currentIntentoId);
-    }, 
+        await sb.from('intentos').update({ aciertos, fallos, arriesgadas, en_blanco: enBlanco }).eq('id', state.currentIntentoId);
+    },
 
     // --- NUEVO: REGISTRO ACTIVIDAD DIARIA ---
     registrarActividadDiaria: async () => {
@@ -511,79 +516,95 @@ const app = {
     },
 
     render: () => {
-        const item = state.q[state.cur];
-        state.status = 'waiting';
-        state.arriesgando = false;
-        document.getElementById('btn-arriesgando').classList.remove('active');
-        document.getElementById('counter').innerText = `Pregunta ${state.cur + 1}/${state.q.length}`;
-        document.getElementById('counter').classList.remove('hidden');
-        
-        let headerHtml = `<div class="test-header-info">${state.currentTestName}</div>`;
-        if (state.testsCache) {
-            const testOrigen = state.testsCache.find(t => t.id === item.test_id);
-            if (testOrigen) {
-                const nombreReal = `${testOrigen.identificador || ''} ${testOrigen.nombre}`.trim();
-                const numOrdenOriginal = item.numero_orden || '?';
-                if (!state.currentTestName.includes(nombreReal)) {
-                    headerHtml += `<div class="test-header-info">${nombreReal} — Pregunta nº ${numOrdenOriginal}</div>`;
-                } else {
-                    headerHtml = `<div class="test-header-info">${state.currentTestName} — Pregunta nº ${numOrdenOriginal}</div>`;
-                }
+    const item = state.q[state.cur];
+    state.status = 'waiting';
+    state.arriesgando = false;
+    state.pasando = false;
+    document.getElementById('btn-arriesgando').classList.remove('active');
+
+    // Mostrar PASAR solo en modo examen
+    const btnPasar = document.getElementById('btn-pasar');
+    if (state.mode === 'examen') {
+        btnPasar.classList.remove('hidden');
+        btnPasar.classList.remove('active');
+    } else {
+        btnPasar.classList.add('hidden');
+    }
+
+    document.getElementById('counter').innerText = `Pregunta ${state.cur + 1}/${state.q.length}`;
+    document.getElementById('counter').classList.remove('hidden');
+    
+    let headerHtml = `<div class="test-header-info">${state.currentTestName}</div>`;
+    if (state.testsCache) {
+        const testOrigen = state.testsCache.find(t => t.id === item.test_id);
+        if (testOrigen) {
+            const nombreReal = `${testOrigen.identificador || ''} ${testOrigen.nombre}`.trim();
+            const numOrdenOriginal = item.numero_orden || '?';
+            if (!state.currentTestName.includes(nombreReal)) {
+                headerHtml += `<div class="test-header-info">${nombreReal} — Pregunta nº ${numOrdenOriginal}</div>`;
+            } else {
+                headerHtml = `<div class="test-header-info">${state.currentTestName} — Pregunta nº ${numOrdenOriginal}</div>`;
             }
         }
+    }
 
-        document.getElementById('q-enunciado').innerHTML = `
-            ${headerHtml}
-            <span id="btn-copy-json" title="Copiar pregunta como JSON" 
-                style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;">
-                📋
-            </span>
-            ${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
+    document.getElementById('q-enunciado').innerHTML = `
+        ${headerHtml}
+        <span id="btn-copy-json" title="Copiar pregunta como JSON" 
+            style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;">
+            📋
+        </span>
+        ${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
 
-        // Añadir el listener por separado, así el JSON nunca interfiere con el HTML
-        document.getElementById('btn-copy-json').addEventListener('click', () => {
-            navigator.clipboard.writeText(JSON.stringify(item, null, 2))
-                .then(() => {
-                    const btn = document.getElementById('btn-copy-json');
-                    btn.style.opacity = "1";
-                    setTimeout(() => btn.style.opacity = "0.4", 800);
-                })
-                .catch(() => alert("No se pudo copiar al portapapeles"));
-        });
+    document.getElementById('btn-copy-json').addEventListener('click', () => {
+        navigator.clipboard.writeText(JSON.stringify(item, null, 2))
+            .then(() => {
+                const btn = document.getElementById('btn-copy-json');
+                btn.style.opacity = "1";
+                setTimeout(() => btn.style.opacity = "0.4", 800);
+            })
+            .catch(() => alert("No se pudo copiar al portapapeles"));
+    });
 
-        const imgEl = document.getElementById('question-img');
-        if (item.imagen_url) {
-            imgEl.src = item.imagen_url;
-            imgEl.classList.remove('hidden');
-        } else {
-            imgEl.classList.add('hidden');
-            imgEl.src = ''; 
+    const imgEl = document.getElementById('question-img');
+    if (item.imagen_url) {
+        imgEl.src = item.imagen_url;
+        imgEl.classList.remove('hidden');
+    } else {
+        imgEl.classList.add('hidden');
+        imgEl.src = ''; 
+    }
+    
+    document.getElementById('q-feedback').classList.add('hidden');
+    const btnAccion = document.getElementById('btn-accion');
+    btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
+    btnAccion.disabled = true;
+    const container = document.getElementById('q-options');
+    container.innerHTML = "";
+    ['a','b','c','d'].forEach(l => {
+        if(item['opcion_'+l]){
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerHTML = `${l.toUpperCase()}) ${app.fixHTML(item['opcion_'+l])}`;
+            btn.onclick = () => app.handleSelect(l, btn);
+            container.appendChild(btn);
         }
-        
-        document.getElementById('q-feedback').classList.add('hidden');
-        const btnAccion = document.getElementById('btn-accion');
-        btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
-        btnAccion.disabled = true;
-        const container = document.getElementById('q-options');
-        container.innerHTML = "";
-        ['a','b','c','d'].forEach(l => {
-            if(item['opcion_'+l]){
-                const btn = document.createElement('button');
-                btn.className = 'option-btn';
-                btn.innerHTML = `${l.toUpperCase()}) ${app.fixHTML(item['opcion_'+l])}`;
-                btn.onclick = () => app.handleSelect(l, btn);
-                container.appendChild(btn);
-            }
-        });
-    },
+    });
+},
 
     handleSelect: (letra, btn) => {
         if (state.status !== 'waiting') return;
         document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        state.ans[state.cur] = { letra, arriesgada: state.arriesgando };
+        state.ans[state.cur] = { letra, arriesgada: state.arriesgando, enBlanco: false };
         document.getElementById('btn-accion').disabled = false;
         app.registrarActividadDiaria();
+
+        // Desactivar PASAR si estaba activo
+        if (state.pasando) {
+            state.pasando = false;
+            document.getElementById('btn-pasar').classList.remove('active');
+        }
     },
 
     manejarAccion: () => {
@@ -623,14 +644,16 @@ const app = {
             const item = state.q[state.cur];
             const res = state.ans[state.cur];
             const correcta = item.correcta.toLowerCase();
-            if (!res || res.letra !== correcta) {
+            // Solo registrar error si contestó mal, no si dejó en blanco
+            if (res && !res.enBlanco && res.letra !== correcta) {
                 app.registrarError(item.id, item.test_id);
             }
             app.actualizarIntento();
         }
 
         if (state.cur < state.q.length - 1) { 
-            state.cur++; 
+            state.cur++;
+            state.pasando = false;
             app.guardarProgreso(); 
             app.render(); 
         } else {
@@ -645,66 +668,67 @@ const app = {
     },
 
     finalizar: async () => {
-        app.stopTimer(); 
-        //state.seconds = 0;
-        //document.getElementById('timer').innerText = app.formatTime(0);
-        document.getElementById('timer').classList.add('hidden');
-        await app.borrarProgreso(); 
-        
-        app.switchView('view-results');
-        //NUEVO----------------------------------------------------------
-        app.setBtnSalir('salir');
-        //----------------------------------------------------------------
-        document.getElementById('counter').classList.add('hidden');
+    app.stopTimer();
+    const tiempoTotal = app.formatTime(state.seconds); // ← guardar ANTES de resetear
+    state.seconds = 0;
+    document.getElementById('timer').innerText = app.formatTime(0);
+    document.getElementById('timer').classList.add('hidden');
+    await app.borrarProgreso(); 
+    
+    app.switchView('view-results');
+    app.setBtnSalir('salir');
+    document.getElementById('counter').classList.add('hidden');
 
-        const total = state.q.length;
-        const aciertos = state.ans.filter((a, i) => a && a.letra === state.q[i].correcta.toLowerCase()).length;
-        const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
-        const fallos = total - aciertos;
-        const porcentaje = ((aciertos / total) * 100).toFixed(1);
-        const tiempoTotal = app.formatTime(state.seconds);
+    const total = state.q.length;
+    const aciertos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
+    const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
+    const fallos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra !== state.q[i].correcta.toLowerCase()).length;
+    const enBlanco = state.ans.filter(a => a && a.enBlanco).length;
+    const porcentaje = ((aciertos / total) * 100).toFixed(1);
 
-        // Guardar Feedback (Siempre)
-        const datosFeedback = {
-            q: state.q,
-            ans: state.ans,
-            headerInfo: { porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, nombre: state.currentTestName }
-        };
+    // Nota sobre 10 con penalización (solo en modo examen)
+    const notaSobre10 = state.mode === 'examen'
+        ? Math.max(0, ((aciertos - fallos / 3) / total) * 10).toFixed(2)
+        : null;
 
-        sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
-            if(error) console.error("Error guardando feedback:", error);
-        });
+    const datosFeedback = {
+        q: state.q,
+        ans: state.ans,
+        mode: state.mode,
+        headerInfo: { porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, enBlanco, notaSobre10, nombre: state.currentTestName }
+    };
+    sb.from('ultimo_feedback').upsert({ id: 1, datos: datosFeedback, created_at: new Date() }).then(({error}) => {
+        if(error) console.error("Error guardando feedback:", error);
+    });
 
-        document.getElementById('final-stats').innerHTML = `
-            <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
-                <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-                    <h2 style="margin: 0 0 15px 0;">DOMINIO FINAL</h2>
-                    <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${porcentaje}%</div>
-                    <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px; color: #a5d6ff;">⏱️ Tiempo: ${tiempoTotal}</div>
-                    <div style="display: flex; gap: 20px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <span style="color: var(--green);">✅ ${aciertos}</span>
-                        <span style="color: var(--red);">❌ ${fallos}</span>
-                        <span style="color: #ff9800;">⚠️ ${arriesgadas}</span>
-                    </div>
-                    <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
-                    <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">
-                        🔁 REPETIR TEST
-                    </button>
-                    <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">
-                        ❌ REPETIR FALLOS
-                    </button>
+    document.getElementById('final-stats').innerHTML = `
+        <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+            <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                <h2 style="margin: 0 0 15px 0;">DOMINIO FINAL</h2>
+                <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${porcentaje}%</div>
+                ${notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${notaSobre10}/10</div>` : ''}
+                <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px; color: #a5d6ff;">⏱️ Tiempo: ${tiempoTotal}</div>
+                <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
+                    <span style="color: var(--green);">✅ ${aciertos}</span>
+                    <span style="color: var(--red);">❌ ${fallos}</span>
+                    <span style="color: #ff9800;">⚠️ ${arriesgadas}</span>
+                    <span style="color: #aaaaaa;">⬜ ${enBlanco}</span>
                 </div>
+                <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
+                <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
+                <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
             </div>
-            <div id="revision-list" style="margin-top: 30px;"></div>`;
-            
-        app.renderRevision();
+        </div>
+        <div id="revision-list" style="margin-top: 30px;"></div>`;
         
-        if (state.currentIntentoId) {
-            await sb.from('intentos').update({ 
-                aciertos, fallos, arriesgadas, completado: true 
-            }).eq('id', state.currentIntentoId);
-        }
-    },
+    app.renderRevision();
+    
+    if (state.currentIntentoId) {
+        await sb.from('intentos').update({ 
+            aciertos, fallos, arriesgadas, en_blanco: enBlanco, completado: true 
+        }).eq('id', state.currentIntentoId);
+    }
+},
 
     verUltimoFeedback: async () => {
         const { data, error } = await sb.from('ultimo_feedback').select('datos').eq('id', 1).single();
@@ -752,55 +776,71 @@ const app = {
     },
 
     renderRevision: () => {
-        const container = document.getElementById('revision-list');
-        const listaTests = state.testsCache || [];
+    const container = document.getElementById('revision-list');
+    const listaTests = state.testsCache || [];
 
-        const html = state.q.map((p, i) => {
-            const res = state.ans[i];
-            const esCorrecta = res && res.letra === p.correcta.toLowerCase();
-            if (esCorrecta && (!res || !res.arriesgada)) return '';
+    const html = state.q.map((p, i) => {
+        const res = state.ans[i];
+        const enBlanco = res && res.enBlanco;
+        const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
 
-            let uCol = res ? (esCorrecta ? "#ff9800" : "var(--red)") : "var(--text)";
-            
-            const testInfo = listaTests.find(t => t.id == p.test_id);
-            let nombreTest = '';
-            if (testInfo) {
-                nombreTest = `${testInfo.identificador || ''} ${testInfo.nombre}`.trim();
-            } else if (state.currentTestId == p.test_id) {
-                nombreTest = state.currentTestName || '';
-            }
+        // Mostrar: fallos, arriesgadas acertadas, y en blanco
+        if (esCorrecta && (!res || !res.arriesgada)) return '';
+        if (!res) return ''; // sin contestar (no debería ocurrir)
 
-            const numPregunta = p.numero_orden || (i + 1);
+        let borderColor, etiqueta;
+        if (enBlanco) {
+            borderColor = '#aaaaaa';
+            etiqueta = '⬜ NO CONTESTADA';
+        } else if (esCorrecta) {
+            borderColor = 'var(--green)';
+            etiqueta = '✅ ACERTADA (CON DUDA)';
+        } else {
+            borderColor = 'var(--red)';
+            etiqueta = '❌ FALLO';
+        }
 
-            return `
-                <div class="rev-item" style="border-left: 5px solid ${esCorrecta ? 'var(--green)' : 'var(--red)'}; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.03); text-align: left; border-radius: 4px;">
-                    <div style="font-weight: bold; margin-bottom: 8px; color: ${esCorrecta ? 'var(--green)' : 'var(--red)'}">
-                        ${esCorrecta ? '✅ ACERTADA (CON DUDA)' : '❌ FALLO'}
-                    </div>
-                    <div style="font-size: 0.85em; color: var(--text); opacity: 0.9; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">
-                        ${nombreTest}
-                    </div>
-                    <div style="margin-bottom: 12px; font-size: 1.05em;">
-                        <strong>${numPregunta}.</strong> ${app.fixHTML(p.enunciado)}
-                    </div>
-                    <div style="font-size: 0.95em; margin-bottom: 5px;">
-                        <span style="opacity: 0.8;">Tu respuesta:</span>
-                        <strong style="color: ${uCol};">
-                            ${res ? res.letra.toUpperCase() + ') ' + app.fixHTML(p['opcion_' + res.letra]) : 'No contestada'}
-                        </strong>
-                    </div>
-                    <div style="font-size: 0.95em;">
-                        <span style="opacity: 0.8;">Respuesta correcta:</span>
-                        <strong style="color: var(--green);">
-                            ${p.correcta.toUpperCase()}) ${app.fixHTML(p['opcion_' + p.correcta.toLowerCase()])}
-                        </strong>
-                    </div>
-                    ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${app.fixHTML(p.feedback)}</div>` : ''}
-                </div>`;
-        }).join('');
-        
-        container.innerHTML = "<h3 style='margin-top:40px; border-bottom: 1px solid #30363d; padding-bottom:10px;'>Revisión de Errores y Dudas</h3>" + (html || '<p style="color:var(--green)">¡Examen perfecto!</p>');
-    },
+        const testInfo = listaTests.find(t => t.id == p.test_id);
+        let nombreTest = '';
+        if (testInfo) {
+            nombreTest = `${testInfo.identificador || ''} ${testInfo.nombre}`.trim();
+        } else if (state.currentTestId == p.test_id) {
+            nombreTest = state.currentTestName || '';
+        }
+
+        const numPregunta = p.numero_orden || (i + 1);
+        const uCol = enBlanco ? '#aaaaaa' : (esCorrecta ? '#ff9800' : 'var(--red)');
+
+        return `
+            <div class="rev-item" style="border-left: 5px solid ${borderColor}; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.03); text-align: left; border-radius: 4px;">
+                <div style="font-weight: bold; margin-bottom: 8px; color: ${borderColor}">
+                    ${etiqueta}
+                </div>
+                <div style="font-size: 0.85em; color: var(--text); opacity: 0.9; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">
+                    ${nombreTest}
+                </div>
+                <div style="margin-bottom: 12px; font-size: 1.05em;">
+                    <strong>${numPregunta}.</strong> ${app.fixHTML(p.enunciado)}
+                </div>
+                ${!enBlanco ? `
+                <div style="font-size: 0.95em; margin-bottom: 5px;">
+                    <span style="opacity: 0.8;">Tu respuesta:</span>
+                    <strong style="color: ${uCol};">
+                        ${res.letra.toUpperCase()}) ${app.fixHTML(p['opcion_' + res.letra])}
+                    </strong>
+                </div>` : ''}
+                <div style="font-size: 0.95em;">
+                    <span style="opacity: 0.8;">Respuesta correcta:</span>
+                    <strong style="color: white;">
+                        ${p.correcta.toUpperCase()}) ${app.fixHTML(p['opcion_' + p.correcta.toLowerCase()])}
+                    </strong>
+                </div>
+                ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${app.fixHTML(p.feedback)}</div>` : ''}
+            </div>`;
+    }).join('');
+    
+    container.innerHTML = "<h3 style='margin-top:40px; border-bottom: 1px solid #30363d; padding-bottom:10px;'>Revisión de Errores y Dudas</h3>" + (html || '<p style="color:var(--green)">¡Examen perfecto!</p>');
+},
 
     switchView: (id) => {
         document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
@@ -1541,6 +1581,32 @@ repetirUltimoTest: async () => {
         app.setBtnSalir('salir');
         app.startTimer();
         app.render();
+    },
+
+    togglePasar: () => {
+        const btnPasar = document.getElementById('btn-pasar');
+        const btnAccion = document.getElementById('btn-accion');
+
+        if (!state.pasando) {
+            // Activar PASAR
+            state.pasando = true;
+            btnPasar.classList.add('active');
+            // Desmarcar cualquier opción seleccionada
+            document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            // Marcar como no contestada
+            state.ans[state.cur] = { letra: null, arriesgada: false, enBlanco: true };
+            // Habilitar SIGUIENTE
+            btnAccion.disabled = false;
+            // Desactivar ARRIESGANDO si estaba activo
+            state.arriesgando = false;
+            document.getElementById('btn-arriesgando').classList.remove('active');
+        } else {
+            // Desactivar PASAR
+            state.pasando = false;
+            btnPasar.classList.remove('active');
+            state.ans[state.cur] = null;
+            btnAccion.disabled = true;
+        }
     },
 
 }; // FIN DEL OBJETO APP
