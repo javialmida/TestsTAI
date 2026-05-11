@@ -803,14 +803,12 @@ const app = {
                     De <strong style="color:#ff9800">${h.arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${h.arriesgadasAcertadas || 0}</strong> → <strong style="color:#ff9800">${h.pctArriesgadasAcertadas || 0}%</strong> de acierto en dudas
                 </div>` : ''}
                 ${hayMas ? `
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <button onclick="app.borrarUltimoFeedback(${feedbackId})" 
-                        style="background: transparent; border: 1px solid var(--red); color: var(--red); padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold;">
-                        🗑️ BORRAR ESTE Y VER EL ANTERIOR
-                    </button>
-                </div>` : ''}
+                ` : ''}
                 <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
                 <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
+                <button onclick="app.borrarUltimoFeedback(${feedbackId})" class="btn-borrar-feedback">
+                        🗑️ BORRAR ESTE Y VER EL ANTERIOR
+                </button>
             </div>
         </div>
         <div id="revision-list" style="margin-top: 30px;"></div>`;
