@@ -713,7 +713,7 @@ margin-right: 5px;
 .btn-repetir {
     display: block;
     width: 95%;
-    padding: 14px 28px;
+    padding: 8px 10px;
     margin-top: 12px;
     border: none;
     border-radius: 6px;
@@ -728,9 +728,27 @@ margin-right: 5px;
     margin-right: auto;
 }
 
-.btn-repetir:hover   { opacity: 0.85; transform: translateY(-2px); }
+.btn-repetir:hover   { opacity: 0.85; transform: none; }
 .btn-repetir:active  { transform: scale(0.98); }
 
 .btn-repetir--todo   { background: var(--green); color: #fff; }
 .btn-repetir--fallos { background: var(--red);   color: #fff; }
 
+/* --- BOTÓN BORRAR FEEDBACK --- */
+.btn-borrar-feedback {
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+    width: 95%;
+    padding: 8px 10px;
+    margin-top: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: bold;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-borrar-feedback:hover {
+    background: var(--red);
+    color: white;
+}
