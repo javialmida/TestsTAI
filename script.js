@@ -817,98 +817,102 @@ const app = {
 },
 
     renderRevision: () => {
-    const container = document.getElementById('revision-list');
-    const listaTests = state.testsCache || [];
+        const container = document.getElementById('revision-list');
+        const listaTests = state.testsCache || [];
 
-    const html = state.q.map((p, i) => {
-        const res = state.ans[i];
-        const enBlanco = res && res.enBlanco;
-        const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
+        const html = state.q.map((p, i) => {
+            const res = state.ans[i];
+            const enBlanco = res && res.enBlanco;
+            const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
 
-        if (esCorrecta && (!res || !res.arriesgada)) return '';
-        if (!res) return '';
+            if (esCorrecta && (!res || !res.arriesgada)) return '';
+            if (!res) return '';
 
-        let borderColor, etiqueta;
-        if (enBlanco) {
-            borderColor = '#aaaaaa';
-            etiqueta = '⬜ NO CONTESTADA';
-        } else if (esCorrecta) {
-            borderColor = 'var(--green)';
-            etiqueta = '✅ ACERTADA (CON DUDA)';
-        } else {
-            borderColor = 'var(--red)';
-            etiqueta = '❌ FALLO';
-        }
+            let borderColor, etiqueta;
+            if (enBlanco) {
+                borderColor = '#aaaaaa';
+                etiqueta = '⬜ NO CONTESTADA';
+            } else if (esCorrecta) {
+                borderColor = 'var(--green)';
+                etiqueta = '✅ ACERTADA (CON DUDA)';
+            } else {
+                borderColor = 'var(--red)';
+                etiqueta = '❌ FALLO';
+            }
 
-        const testInfo = listaTests.find(t => t.id == p.test_id);
-        let nombreTest = '';
-        if (testInfo) {
-            nombreTest = `${testInfo.identificador || ''} ${testInfo.nombre}`.trim();
-        } else if (state.currentTestId == p.test_id) {
-            nombreTest = state.currentTestName || '';
-        }
+            const testInfo = listaTests.find(t => t.id == p.test_id);
+            let nombreTest = '';
+            if (testInfo) {
+                nombreTest = `${testInfo.identificador || ''} ${testInfo.nombre}`.trim();
+            } else if (state.currentTestId == p.test_id) {
+                nombreTest = state.currentTestName || '';
+            }
 
-        const numPregunta = p.numero_orden || (i + 1);
-        const uCol = enBlanco ? '#aaaaaa' : (esCorrecta ? '#ff9800' : 'var(--red)');
+            const numPregunta = p.numero_orden || (i + 1);
+            const uCol = enBlanco ? '#aaaaaa' : (esCorrecta ? '#ff9800' : 'var(--red)');
+            const copyBtnId = `btn-copy-${i}`;
 
-        // ID único para el botón de copiar de esta pregunta
-        const copyBtnId = `btn-copy-${i}`;
+            return `
+                <div class="rev-item" style="border-left: 5px solid ${borderColor}; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.03); text-align: left; border-radius: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-weight: bold; color: ${borderColor}">${etiqueta}</div>
+                        <span id="${copyBtnId}" title="Copiar pregunta como JSON" 
+                            style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; margin-left:10px;">
+                            📋
+                        </span>
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--text); opacity: 0.9; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">
+                        ${nombreTest}
+                    </div>
+                    <div style="margin-bottom: 12px; font-size: 1.05em;">
+                        <strong>${numPregunta}.</strong> ${app.fixHTML(p.enunciado)}
+                    </div>
+                    ${p.imagen_url ? `
+                    <div style="margin-bottom: 12px; text-align: center;">
+                        <img src="${p.imagen_url}" 
+                            alt="Imagen de la pregunta" 
+                            style="max-width: 100%; max-height: 300px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); object-fit: contain;">
+                    </div>` : ''}
+                    ${!enBlanco ? `
+                    <div style="font-size: 0.95em; margin-bottom: 5px;">
+                        <span style="opacity: 0.8;">Tu respuesta:</span>
+                        <strong style="color: ${uCol};">
+                            ${res.letra.toUpperCase()}) ${app.fixHTML(p['opcion_' + res.letra])}
+                        </strong>
+                    </div>` : ''}
+                    <div style="font-size: 0.95em;">
+                        <span style="opacity: 0.8;">Respuesta correcta:</span>
+                        <strong style="color: white;">
+                            ${p.correcta.toUpperCase()}) ${app.fixHTML(p['opcion_' + p.correcta.toLowerCase()])}
+                        </strong>
+                    </div>
+                    ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${app.fixHTML(p.feedback)}</div>` : ''}
+                </div>`;
+        }).join('');
+        
+        container.innerHTML = "<h3 style='margin-top:40px; border-bottom: 1px solid #30363d; padding-bottom:10px;'>Revisión de Errores y Dudas</h3>" + (html || '<p style="color:var(--green)">¡Examen perfecto!</p>');
 
-        return `
-            <div class="rev-item" style="border-left: 5px solid ${borderColor}; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.03); text-align: left; border-radius: 4px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="font-weight: bold; color: ${borderColor}">${etiqueta}</div>
-                    <span id="${copyBtnId}" title="Copiar pregunta como JSON" 
-                        style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; margin-left:10px;">
-                        📋
-                    </span>
-                </div>
-                <div style="font-size: 0.85em; color: var(--text); opacity: 0.9; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;">
-                    ${nombreTest}
-                </div>
-                <div style="margin-bottom: 12px; font-size: 1.05em;">
-                    <strong>${numPregunta}.</strong> ${app.fixHTML(p.enunciado)}
-                </div>
-                ${!enBlanco ? `
-                <div style="font-size: 0.95em; margin-bottom: 5px;">
-                    <span style="opacity: 0.8;">Tu respuesta:</span>
-                    <strong style="color: ${uCol};">
-                        ${res.letra.toUpperCase()}) ${app.fixHTML(p['opcion_' + res.letra])}
-                    </strong>
-                </div>` : ''}
-                <div style="font-size: 0.95em;">
-                    <span style="opacity: 0.8;">Respuesta correcta:</span>
-                    <strong style="color: white;">
-                        ${p.correcta.toUpperCase()}) ${app.fixHTML(p['opcion_' + p.correcta.toLowerCase()])}
-                    </strong>
-                </div>
-                ${p.feedback ? `<div style="margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.1); border-radius: 4px; font-style: italic; font-size: 0.9em; color: #a5d6ff;">💡 ${app.fixHTML(p.feedback)}</div>` : ''}
-            </div>`;
-    }).join('');
-    
-    container.innerHTML = "<h3 style='margin-top:40px; border-bottom: 1px solid #30363d; padding-bottom:10px;'>Revisión de Errores y Dudas</h3>" + (html || '<p style="color:var(--green)">¡Examen perfecto!</p>');
+        // Listeners para botones de copiar JSON
+        state.q.forEach((p, i) => {
+            const res = state.ans[i];
+            const enBlanco = res && res.enBlanco;
+            const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
+            if (esCorrecta && (!res || !res.arriesgada)) return;
+            if (!res) return;
 
-    // Añadir listeners a los botones de copiar JSON después de renderizar
-    state.q.forEach((p, i) => {
-        const res = state.ans[i];
-        const enBlanco = res && res.enBlanco;
-        const esCorrecta = res && !enBlanco && res.letra === p.correcta.toLowerCase();
-        if (esCorrecta && (!res || !res.arriesgada)) return;
-        if (!res) return;
-
-        const btn = document.getElementById(`btn-copy-${i}`);
-        if (btn) {
-            btn.addEventListener('click', () => {
-                navigator.clipboard.writeText(JSON.stringify(p, null, 2))
-                    .then(() => {
-                        btn.style.opacity = "1";
-                        setTimeout(() => btn.style.opacity = "0.4", 800);
-                    })
-                    .catch(() => alert("No se pudo copiar al portapapeles"));
-            });
-        }
-    });
-},
+            const btn = document.getElementById(`btn-copy-${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(JSON.stringify(p, null, 2))
+                        .then(() => {
+                            btn.style.opacity = "1";
+                            setTimeout(() => btn.style.opacity = "0.4", 800);
+                        })
+                        .catch(() => alert("No se pudo copiar al portapapeles"));
+                });
+            }
+        });
+    },
 
     switchView: (id) => {
         document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
