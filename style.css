@@ -138,6 +138,40 @@ header {
         gap: 15px;
         text-align: center;
     }
+
+    /* NUEVO: botonera en grid para móvil */
+    .test-controls {
+        padding: 12px 15px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 10px;
+        justify-content: unset;
+    }
+
+    #btn-arriesgando {
+        grid-column: 1;
+        grid-row: 1;
+        padding: 12px 10px;
+        font-size: 0.85em;
+        min-width: unset;
+    }
+
+    #btn-pasar {
+        grid-column: 2;
+        grid-row: 1;
+        padding: 12px 10px;
+        font-size: 0.85em;
+        min-width: unset;
+    }
+
+    #btn-accion {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        width: 100%;
+        padding: 16px;
+    }
+
 }
 
 /* --- ESTILOS COMPLEMENTARIOS --- */
