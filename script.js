@@ -604,14 +604,11 @@ const app = {
     },
 
     manejarAccion: () => {
-        // Si está en modo PASAR, siempre avanza a la siguiente
-        if (state.pasando) {
-            app.siguiente();
-            return;
-        }
+        // En modo examen siempre avanza
         if (state.mode === 'examen') {
             app.siguiente();
         } else {
+            // En modo estudio, decide según lo que diga el botón
             const btn = document.getElementById('btn-accion');
             if (btn.innerText === "CORREGIR") app.corregir();
             else app.siguiente();
@@ -620,21 +617,29 @@ const app = {
 
     corregir: async () => {
         const item = state.q[state.cur];
-        const userSel = state.ans[state.cur]?.letra;
+        const res = state.ans[state.cur];
+        const userSel = res?.letra; // Extraemos la letra de forma segura
         const correcta = item.correcta.toLowerCase();
+        
         document.querySelectorAll('.option-btn').forEach(b => {
             const l = b.innerText[0].toLowerCase();
+            // Siempre mostramos cuál era la correcta
             if (l === correcta) b.classList.add('correct');
-            if (l === userSel && userSel !== correcta) b.classList.add('incorrect');
+            // Solo marcamos error en rojo si el usuario seleccionó una opción y era incorrecta
+            if (userSel && l === userSel && userSel !== correcta) b.classList.add('incorrect');
         });
-        if (userSel !== correcta) await app.registrarError(item.id, item.test_id);
+        
+        // Solo registramos fallo si el usuario marcó una opción incorrecta (ignoramos si la pasó/dejó en blanco)
+        if (userSel && userSel !== correcta && (!res || !res.enBlanco)) {
+            await app.registrarError(item.id, item.test_id);
+        }
         
         if (item.feedback) { 
             const fbDiv = document.getElementById('q-feedback');
-            // Cambiamos innerText por innerHTML y aplicamos fixHTML
             fbDiv.innerHTML = "💡 " + app.fixHTML(item.feedback);
             fbDiv.classList.remove('hidden');
         }
+        
         state.status = 'done';
         document.getElementById('btn-accion').innerText = "SIGUIENTE";
         app.guardarProgreso();
@@ -664,6 +669,9 @@ const app = {
     },
 
    toggleArriesgando: () => {
+        // Bloqueo: si la pregunta ya está corregida, no hacer nada
+        if (state.status !== 'waiting') return;
+
         state.arriesgando = !state.arriesgando;
         document.getElementById('btn-arriesgando').classList.toggle('active');
         if (state.ans[state.cur]) state.ans[state.cur].arriesgada = state.arriesgando;
@@ -1670,33 +1678,39 @@ repetirUltimoTest: async () => {
 },
 
     togglePasar: () => {
-    const btnPasar = document.getElementById('btn-pasar');
-    const btnAccion = document.getElementById('btn-accion');
+        // Bloqueo: si la pregunta ya está corregida, no hacer nada
+        if (state.status !== 'waiting') return;
 
-    if (!state.pasando) {
-        // Activar PASAR
-        state.pasando = true;
-        btnPasar.classList.add('active');
-        // Desmarcar cualquier opción seleccionada
-        document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-        // Marcar como no contestada
-        state.ans[state.cur] = { letra: null, arriesgada: false, enBlanco: true };
-        // En modo estudio el botón pasa a decir SIGUIENTE, en examen ya lo era
-        btnAccion.innerText = "SIGUIENTE";
-        btnAccion.disabled = false;
-        // Desactivar ARRIESGANDO si estaba activo
-        state.arriesgando = false;
-        document.getElementById('btn-arriesgando').classList.remove('active');
-    } else {
-        // Desactivar PASAR
-        state.pasando = false;
-        btnPasar.classList.remove('active');
-        state.ans[state.cur] = null;
-        // Restaurar texto del botón según modo
-        btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
-        btnAccion.disabled = true;
-    }
-},
+        const btnPasar = document.getElementById('btn-pasar');
+        const btnAccion = document.getElementById('btn-accion');
+
+        if (!state.pasando) {
+            // Activar PASAR
+            state.pasando = true;
+            btnPasar.classList.add('active');
+            // Desmarcar cualquier opción seleccionada
+            document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            // Marcar como no contestada
+            state.ans[state.cur] = { letra: null, arriesgada: false, enBlanco: true };
+            
+            // Activar botón principal, pero manteniendo el texto original según el modo
+            btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
+            btnAccion.disabled = false;
+            
+            // Desactivar ARRIESGANDO si estaba activo
+            state.arriesgando = false;
+            document.getElementById('btn-arriesgando').classList.remove('active');
+        } else {
+            // Desactivar PASAR
+            state.pasando = false;
+            btnPasar.classList.remove('active');
+            state.ans[state.cur] = null;
+            
+            // Restaurar estado deshabilitado del botón principal
+            btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
+            btnAccion.disabled = true;
+        }
+    },
 
     borrarUltimoFeedback: async (feedbackId) => {
         if (!confirm("¿Borrar este feedback y ver el anterior?")) return;
