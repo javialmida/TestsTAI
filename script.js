@@ -25,20 +25,25 @@ const app = {
 
     fixHTML: (text) => {
         if (!text) return "";
+        
+        // Convertimos a string por seguridad para evitar errores con nulos/números
+        text = String(text);
+
         const codeBlocks = [];
         let protectedText = text.replace(/<pre>([\s\S]*?)<\/pre>/g, (match, contenido) => {
             codeBlocks.push(contenido);
             return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
         });
 
-        // Regex inteligente: Sólo escapa el '&' si NO forma parte de una entidad ya escapada
+        // Regex inteligente + doble chequeo de saltos de línea
         let safeText = protectedText
             .replace(/&(?!(?:[a-zA-Z0-9]+|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;")
-            .replace(/\r?\n/g, "<br>"); // ✨ NUEVO: Convierte saltos físicos en saltos HTML
+            .replace(/\r?\n/g, "<br>")           // Atrapa los saltos físicos invisibles
+            .replace(/\\r\\n|\\n|\\r/g, "<br>"); // Atrapa los saltos en texto literal de Supabase (\n o \r\n)
 
         return safeText.replace(/__CODE_BLOCK_(\d+)__/g, (match, index) => {
             let codeContent = codeBlocks[index];
@@ -48,7 +53,6 @@ const app = {
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
-            // Nota: Aquí no ponemos el replace del <br> porque dentro de <pre> ya se respetan los saltos solos
             return `<pre>${safeCode}</pre>`;
         });
     },
