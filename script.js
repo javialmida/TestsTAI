@@ -699,87 +699,86 @@ const app = {
     },
 
     finalizar: async () => {
-    app.stopTimer();
-    const tiempoTotal = app.formatTime(state.seconds);
-    state.seconds = 0;
-    document.getElementById('timer').innerText = app.formatTime(0);
-    document.getElementById('timer').classList.add('hidden');
-    await app.borrarProgreso(); 
-    
-    app.switchView('view-results');
-    app.setBtnSalir('salir');
-    document.getElementById('counter').classList.add('hidden');
-
-    const total = state.q.length;
-    const aciertos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
-    const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
-    const fallos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra !== state.q[i].correcta.toLowerCase()).length;
-    const enBlanco = state.ans.filter(a => a && a.enBlanco).length;
-    const arriesgadasAcertadas = state.ans.filter((a, i) => a && a.arriesgada && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
-    const pctArriesgadasAcertadas = arriesgadas > 0 ? ((arriesgadasAcertadas / arriesgadas) * 100).toFixed(0) : 0;
-    const porcentaje = ((aciertos / total) * 100).toFixed(1);
-
-    const notaSobre10 = state.mode === 'examen'
-        ? Math.max(0, ((aciertos - fallos / 3) / total) * 10).toFixed(2)
-        : null;
-
-    const datosFeedback = {
-        q: state.q,
-        ans: state.ans,
-        mode: state.mode,
-        headerInfo: { 
-            porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, 
-            arriesgadasAcertadas, pctArriesgadasAcertadas,
-            enBlanco, notaSobre10, nombre: state.currentTestName 
-        }
-    };
-
-    // Insertar nuevo feedback
-    await sb.from('ultimo_feedback').insert({ datos: datosFeedback });
-
-    // Mantener solo los últimos 3, borrar los más antiguos
-    const { data: todos } = await sb.from('ultimo_feedback')
-        .select('id')
-        .order('id', { ascending: false });
-    
-    if (todos && todos.length > 3) {
-        const idsABorrar = todos.slice(3).map(r => r.id);
-        await sb.from('ultimo_feedback').delete().in('id', idsABorrar);
-    }
-
-    document.getElementById('final-stats').innerHTML = `
-        <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
-            <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-                <h2 style="margin: 0 0 10px 0;">DOMINIO FINAL</h2>
-                <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${state.currentTestName}</div>
-                <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${porcentaje}%</div>
-                ${notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${notaSobre10}/10</div>` : ''}
-                <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px; color: #a5d6ff;">⏱️ Tiempo: ${tiempoTotal}</div>
-                <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
-                    <span style="color: var(--green);">✅ ${aciertos}</span>
-                    <span style="color: var(--red);">❌ ${fallos}</span>
-                    <span style="color: #ff9800;">⚠️ ${arriesgadas}</span>
-                    <span style="color: #aaaaaa;">⬜ ${enBlanco}</span>
-                </div>
-                ${arriesgadas > 0 ? `
-                <div style="margin-top: 12px; font-size: 0.85em; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
-                    De <strong style="color:#ff9800">${arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${arriesgadasAcertadas}</strong> → <strong style="color:#ff9800">${pctArriesgadasAcertadas}%</strong> de acierto en dudas
-                </div>` : ''}
-                <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
-                <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
-                <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
-            </div>
-        </div>
-        <div id="revision-list" style="margin-top: 30px;"></div>`;
+        app.stopTimer();
+        const tiempoTotal = app.formatTime(state.seconds);
+        state.seconds = 0;
+        document.getElementById('timer').innerText = app.formatTime(0);
+        document.getElementById('timer').classList.add('hidden');
+        await app.borrarProgreso(); 
         
-    app.renderRevision();
-    
-    if (state.currentIntentoId) {
-        await sb.from('intentos').update({ 
-            aciertos, fallos, arriesgadas, en_blanco: enBlanco, completado: true 
-        }).eq('id', state.currentIntentoId);
-    }
-},
+        app.switchView('view-results');
+        app.setBtnSalir('salir');
+        document.getElementById('counter').classList.add('hidden');
+
+        const total = state.q.length;
+        const aciertos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
+        const arriesgadas = state.ans.filter(a => a && a.arriesgada).length;
+        const fallos = state.ans.filter((a, i) => a && !a.enBlanco && a.letra !== state.q[i].correcta.toLowerCase()).length;
+        const enBlanco = state.ans.filter(a => a && a.enBlanco).length;
+        const arriesgadasAcertadas = state.ans.filter((a, i) => a && a.arriesgada && !a.enBlanco && a.letra === state.q[i].correcta.toLowerCase()).length;
+        const pctArriesgadasAcertadas = arriesgadas > 0 ? ((arriesgadasAcertadas / arriesgadas) * 100).toFixed(0) : 0;
+        const porcentaje = ((aciertos / total) * 100).toFixed(1);
+
+        // ✨ CAMBIO: Calculamos la nota sobre 10 siempre, independientemente del modo
+        const notaSobre10 = Math.max(0, ((aciertos - fallos / 3) / total) * 10).toFixed(2);
+
+        const datosFeedback = {
+            q: state.q,
+            ans: state.ans,
+            mode: state.mode,
+            headerInfo: { 
+                porcentaje, tiempoTotal, aciertos, fallos, arriesgadas, 
+                arriesgadasAcertadas, pctArriesgadasAcertadas,
+                enBlanco, notaSobre10, nombre: state.currentTestName 
+            }
+        };
+
+        // Insertar nuevo feedback
+        await sb.from('ultimo_feedback').insert({ datos: datosFeedback });
+
+        // Mantener solo los últimos 3, borrar los más antiguos
+        const { data: todos } = await sb.from('ultimo_feedback')
+            .select('id')
+            .order('id', { ascending: false });
+        
+        if (todos && todos.length > 3) {
+            const idsABorrar = todos.slice(3).map(r => r.id);
+            await sb.from('ultimo_feedback').delete().in('id', idsABorrar);
+        }
+
+        document.getElementById('final-stats').innerHTML = `
+            <div class="dominio-container" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+                <div class="dominio-card" style="width: 100%; max-width: 500px; padding: 30px; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                    <h2 style="margin: 0 0 10px 0;">DOMINIO FINAL</h2>
+                    <div style="font-size: 0.95em; font-weight: bold; color: var(--accent); margin-bottom: 15px;">${state.currentTestName}</div>
+                    <div class="dominio-porcentaje" style="font-size: 3.5em; font-weight: bold; line-height: 1; margin-bottom: 5px;">${porcentaje}%</div>
+                    ${notaSobre10 ? `<div style="font-size: 1.4em; font-weight: bold; color: #a5d6ff; margin-bottom: 10px;">Nota examen: ${notaSobre10}/10</div>` : ''}
+                    <div style="font-size: 1.1em; opacity: 0.8; margin-bottom: 20px; color: #a5d6ff;">⏱️ Tiempo: ${tiempoTotal}</div>
+                    <div style="display: flex; gap: 15px; justify-content: center; font-weight: bold; font-size: 1.1em; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;">
+                        <span style="color: var(--green);">✅ ${aciertos}</span>
+                        <span style="color: var(--red);">❌ ${fallos}</span>
+                        <span style="color: #ff9800;">⚠️ ${arriesgadas}</span>
+                        <span style="color: #aaaaaa;">⬜ ${enBlanco}</span>
+                    </div>
+                    ${arriesgadas > 0 ? `
+                    <div style="margin-top: 12px; font-size: 0.85em; opacity: 0.7; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                        De <strong style="color:#ff9800">${arriesgadas} dudas</strong>, acertaste <strong style="color:#ff9800">${arriesgadasAcertadas}</strong> → <strong style="color:#ff9800">${pctArriesgadasAcertadas}%</strong> de acierto en dudas
+                    </div>` : ''}
+                    <p class="dominio-mensaje" style="margin-top: 20px; font-size: 0.9em; opacity: 0.7;">Has completado el test. Revisa tus fallos abajo.</p>
+                    <button onclick="app.repetirUltimoTest()" class="btn-repetir btn-repetir--todo">🔁 REPETIR ESTE TEST</button>
+                    <button onclick="app.repetirSoloFallos()" class="btn-repetir btn-repetir--fallos">❌ REPETIR SOLO FALLOS</button>
+                </div>
+            </div>
+            <div id="revision-list" style="margin-top: 30px;"></div>`;
+            
+        app.renderRevision();
+        
+        if (state.currentIntentoId) {
+            await sb.from('intentos').update({ 
+                aciertos, fallos, arriesgadas, en_blanco: enBlanco, completado: true 
+            }).eq('id', state.currentIntentoId);
+        }
+    },
 
     verUltimoFeedback: async () => {
     const { data, error } = await sb.from('ultimo_feedback')
