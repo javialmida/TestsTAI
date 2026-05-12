@@ -37,7 +37,8 @@ const app = {
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+            .replace(/'/g, "&#039;")
+            .replace(/\r?\n/g, "<br>"); // ✨ NUEVO: Convierte saltos físicos en saltos HTML
 
         return safeText.replace(/__CODE_BLOCK_(\d+)__/g, (match, index) => {
             let codeContent = codeBlocks[index];
@@ -47,6 +48,7 @@ const app = {
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+            // Nota: Aquí no ponemos el replace del <br> porque dentro de <pre> ya se respetan los saltos solos
             return `<pre>${safeCode}</pre>`;
         });
     },
