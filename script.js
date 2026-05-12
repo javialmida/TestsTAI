@@ -516,81 +516,77 @@ const app = {
     },
 
     render: () => {
-    const item = state.q[state.cur];
-    state.status = 'waiting';
-    state.arriesgando = false;
-    state.pasando = false;
-    document.getElementById('btn-arriesgando').classList.remove('active');
+        const item = state.q[state.cur];
+        state.status = 'waiting';
+        state.arriesgando = false;
+        state.pasando = false;
+        document.getElementById('btn-arriesgando').classList.remove('active');
 
-    // Mostrar PASAR solo en modo examen
-    const btnPasar = document.getElementById('btn-pasar');
-    if (state.mode === 'examen') {
+        // PASAR visible en ambos modos
+        const btnPasar = document.getElementById('btn-pasar');
         btnPasar.classList.remove('hidden');
         btnPasar.classList.remove('active');
-    } else {
-        btnPasar.classList.add('hidden');
-    }
 
-    document.getElementById('counter').innerText = `Pregunta ${state.cur + 1}/${state.q.length}`;
-    document.getElementById('counter').classList.remove('hidden');
-    
-    let headerHtml = `<div class="test-header-info">${state.currentTestName}</div>`;
-    if (state.testsCache) {
-        const testOrigen = state.testsCache.find(t => t.id === item.test_id);
-        if (testOrigen) {
-            const nombreReal = `${testOrigen.identificador || ''} ${testOrigen.nombre}`.trim();
-            const numOrdenOriginal = item.numero_orden || '?';
-            if (!state.currentTestName.includes(nombreReal)) {
-                headerHtml += `<div class="test-header-info">${nombreReal} — Pregunta nº ${numOrdenOriginal}</div>`;
-            } else {
-                headerHtml = `<div class="test-header-info">${state.currentTestName} — Pregunta nº ${numOrdenOriginal}</div>`;
+        document.getElementById('counter').innerText = `Pregunta ${state.cur + 1}/${state.q.length}`;
+        document.getElementById('counter').classList.remove('hidden');
+        
+        let headerHtml = `<div class="test-header-info">${state.currentTestName}</div>`;
+        if (state.testsCache) {
+            const testOrigen = state.testsCache.find(t => t.id === item.test_id);
+            if (testOrigen) {
+                const nombreReal = `${testOrigen.identificador || ''} ${testOrigen.nombre}`.trim();
+                const numOrdenOriginal = item.numero_orden || '?';
+                if (!state.currentTestName.includes(nombreReal)) {
+                    headerHtml += `<div class="test-header-info">${nombreReal} — Pregunta nº ${numOrdenOriginal}</div>`;
+                } else {
+                    headerHtml = `<div class="test-header-info">${state.currentTestName} — Pregunta nº ${numOrdenOriginal}</div>`;
+                }
             }
         }
-    }
 
-    document.getElementById('q-enunciado').innerHTML = `
-        ${headerHtml}
-        <span id="btn-copy-json" title="Copiar pregunta como JSON" 
-            style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;">
-            📋
-        </span>
-        ${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
+        document.getElementById('q-enunciado').innerHTML = `
+            ${headerHtml}
+            <span id="btn-copy-json" title="Copiar pregunta como JSON" 
+                style="cursor:pointer; font-size:0.85em; opacity:0.4; user-select:none; float:right; margin-left:10px;">
+                📋
+            </span>
+            ${state.cur + 1}. ${app.fixHTML(item.enunciado)}`;
 
-    document.getElementById('btn-copy-json').addEventListener('click', () => {
-        navigator.clipboard.writeText(JSON.stringify(item, null, 2))
-            .then(() => {
-                const btn = document.getElementById('btn-copy-json');
-                btn.style.opacity = "1";
-                setTimeout(() => btn.style.opacity = "0.4", 800);
-            })
-            .catch(() => alert("No se pudo copiar al portapapeles"));
-    });
+        document.getElementById('btn-copy-json').addEventListener('click', () => {
+            navigator.clipboard.writeText(JSON.stringify(item, null, 2))
+                .then(() => {
+                    const btn = document.getElementById('btn-copy-json');
+                    btn.style.opacity = "1";
+                    setTimeout(() => btn.style.opacity = "0.4", 800);
+                })
+                .catch(() => alert("No se pudo copiar al portapapeles"));
+        });
 
-    const imgEl = document.getElementById('question-img');
-    if (item.imagen_url) {
-        imgEl.src = item.imagen_url;
-        imgEl.classList.remove('hidden');
-    } else {
-        imgEl.classList.add('hidden');
-        imgEl.src = ''; 
-    }
-    
-    document.getElementById('q-feedback').classList.add('hidden');
-    const btnAccion = document.getElementById('btn-accion');
-    btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
-    btnAccion.disabled = true;
-    const container = document.getElementById('q-options');
-    container.innerHTML = "";
-    ['a','b','c','d'].forEach(l => {
-        if(item['opcion_'+l]){
-            const btn = document.createElement('button');
-            btn.className = 'option-btn';
-            btn.innerHTML = `${l.toUpperCase()}) ${app.fixHTML(item['opcion_'+l])}`;
-            btn.onclick = () => app.handleSelect(l, btn);
-            container.appendChild(btn);
+        const imgEl = document.getElementById('question-img');
+        if (item.imagen_url) {
+            imgEl.src = item.imagen_url;
+            imgEl.classList.remove('hidden');
+        } else {
+            imgEl.classList.add('hidden');
+            imgEl.src = ''; 
         }
-    });
-},
+        
+        document.getElementById('q-feedback').classList.add('hidden');
+        const btnAccion = document.getElementById('btn-accion');
+        btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
+        btnAccion.disabled = true;
+        const container = document.getElementById('q-options');
+        container.innerHTML = "";
+        ['a','b','c','d'].forEach(l => {
+            if(item['opcion_'+l]){
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = `${l.toUpperCase()}) ${app.fixHTML(item['opcion_'+l])}`;
+                btn.onclick = () => app.handleSelect(l, btn);
+                container.appendChild(btn);
+            }
+        });
+    },
 
     handleSelect: (letra, btn) => {
         if (state.status !== 'waiting') return;
@@ -608,8 +604,14 @@ const app = {
     },
 
     manejarAccion: () => {
-        if (state.mode === 'examen') app.siguiente();
-        else {
+        // Si está en modo PASAR, siempre avanza a la siguiente
+        if (state.pasando) {
+            app.siguiente();
+            return;
+        }
+        if (state.mode === 'examen') {
+            app.siguiente();
+        } else {
             const btn = document.getElementById('btn-accion');
             if (btn.innerText === "CORREGIR") app.corregir();
             else app.siguiente();
@@ -661,7 +663,7 @@ const app = {
         }
     },
 
-    toggleArriesgando: () => {
+   toggleArriesgando: () => {
         state.arriesgando = !state.arriesgando;
         document.getElementById('btn-arriesgando').classList.toggle('active');
         if (state.ans[state.cur]) state.ans[state.cur].arriesgada = state.arriesgando;
@@ -671,7 +673,11 @@ const app = {
             state.pasando = false;
             document.getElementById('btn-pasar').classList.remove('active');
             state.ans[state.cur] = null;
-            document.getElementById('btn-accion').disabled = true;
+            
+            const btnAccion = document.getElementById('btn-accion');
+            btnAccion.disabled = true;
+            // Restaurar el texto del botón según el modo
+            btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
         }
     },
 
@@ -1664,30 +1670,33 @@ repetirUltimoTest: async () => {
 },
 
     togglePasar: () => {
-        const btnPasar = document.getElementById('btn-pasar');
-        const btnAccion = document.getElementById('btn-accion');
+    const btnPasar = document.getElementById('btn-pasar');
+    const btnAccion = document.getElementById('btn-accion');
 
-        if (!state.pasando) {
-            // Activar PASAR
-            state.pasando = true;
-            btnPasar.classList.add('active');
-            // Desmarcar cualquier opción seleccionada
-            document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-            // Marcar como no contestada
-            state.ans[state.cur] = { letra: null, arriesgada: false, enBlanco: true };
-            // Habilitar SIGUIENTE
-            btnAccion.disabled = false;
-            // Desactivar ARRIESGANDO si estaba activo
-            state.arriesgando = false;
-            document.getElementById('btn-arriesgando').classList.remove('active');
-        } else {
-            // Desactivar PASAR
-            state.pasando = false;
-            btnPasar.classList.remove('active');
-            state.ans[state.cur] = null;
-            btnAccion.disabled = true;
-        }
-    },
+    if (!state.pasando) {
+        // Activar PASAR
+        state.pasando = true;
+        btnPasar.classList.add('active');
+        // Desmarcar cualquier opción seleccionada
+        document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+        // Marcar como no contestada
+        state.ans[state.cur] = { letra: null, arriesgada: false, enBlanco: true };
+        // En modo estudio el botón pasa a decir SIGUIENTE, en examen ya lo era
+        btnAccion.innerText = "SIGUIENTE";
+        btnAccion.disabled = false;
+        // Desactivar ARRIESGANDO si estaba activo
+        state.arriesgando = false;
+        document.getElementById('btn-arriesgando').classList.remove('active');
+    } else {
+        // Desactivar PASAR
+        state.pasando = false;
+        btnPasar.classList.remove('active');
+        state.ans[state.cur] = null;
+        // Restaurar texto del botón según modo
+        btnAccion.innerText = (state.mode === 'examen') ? "SIGUIENTE" : "CORREGIR";
+        btnAccion.disabled = true;
+    }
+},
 
     borrarUltimoFeedback: async (feedbackId) => {
         if (!confirm("¿Borrar este feedback y ver el anterior?")) return;
