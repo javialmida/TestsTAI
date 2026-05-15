@@ -202,11 +202,15 @@ const app = {
                 const nombreMostrar = bloqueEncontrado ? bloqueEncontrado.nombre : `BLOQUE ${bId}`;
                 bloques[bId].sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true }));
 
+                // Comprobar si TODOS los tests de este bloque están en testsHechos
+                const todosHechos = bloques[bId].length > 0 && bloques[bId].every(t => testsHechos.has(t.id));
+                const marcaHecho = todosHechos ? ' ✅' : '';
+
                 const detalles = document.createElement('details');
                 detalles.className = 'bloque-container';
                 detalles.innerHTML = `
                     <summary class="bloque-header">
-                        <span>📦 ${nombreMostrar}</span>
+                        <span>📦 ${nombreMostrar}${marcaHecho}</span>
                         <small>${bloques[bId].length} tests</small>
                     </summary>
                     <div class="bloque-content">
